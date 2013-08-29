@@ -1,16 +1,38 @@
+import os
+
 try:
     from setuptools.core import setup
 except ImportError:
     from distutils.core import setup
 
+def get_version():
+    INIT = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                           'dimon', '__init__.py'))
+    f = open(INIT, 'r')
+    try:
+        for line in f:
+            if line.startswith('__version__'):
+                ret = eval(line.strip().split(' = ')[1])
+                assert ret.count('.') == 2, ret
+                for num in ret.split('.'):
+                    assert num.isdigit(), ret
+                return ret
+        else:
+            raise ValueError("couldn't find version string")
+    finally:
+        f.close()
+
+VERSION = get_version()
+
 setup(
-    name='dimon',
-    version='0.1.0',
-    author='Mani Monajjemi',
-    author_email='TODO',
-    packages=['dimon', 'dimon.tests'],
-    url='TODO',
-    license='LICENSE.txt',
-    description='TODO',
-    test_suite='demon.tests.get_suite'
+    name = 'dimon',
+    version = VERSION,
+    author = 'Mani Monajjemi',
+    author_email = 'TODO',
+    packages = ['dimon'],
+    url = 'TODO',
+    license = 'LICENSE',
+    install_requires = ['pcapy', 'psutil'],
+    description = 'TODO',
+    test_suite = 'test.test_dimon.get_suite'
 )
