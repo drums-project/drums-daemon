@@ -17,8 +17,8 @@ from dimon._common import *
 from pprint import pprint
 
 class BasicTask(TaskBase):
-    def __init__(self, default_interval):
-        TaskBase.__init__(self, default_interval)
+    def __init__(self, result_queue, default_interval):
+        TaskBase.__init__(self, result_queue, default_interval)
 
     def register_task_core(self, task):
         self.task_map[task] = 0
@@ -34,16 +34,17 @@ class BasicTask(TaskBase):
 
 class TaskBaseTest(unittest.TestCase):
     def test_loop(self):
-        task = BasicTask(0.1)
+        q = Queue()
+        task = BasicTask(q, 0.1)
         task.register_task('t1')
         task.start()
         try:
             time.sleep(0.1)
-            d = task.result_queue.get()
+            d = q.get()
             self.assertEqual(len(d), 1)
             task.register_task('t2')
             time.sleep(0.1)
-            d = task.result_queue.get()
+            d = q.get()
             self.assertEqual(len(d), 2)
             time.sleep(0.5)
             self.assertGreater(d['t1'], 0)
@@ -51,7 +52,7 @@ class TaskBaseTest(unittest.TestCase):
             task.flush_result_queue()
             task.remove_task('t2')
             time.sleep(0.1)
-            d = task.result_queue.get()
+            d = q.get()
             self.assertEqual(len(d), 1)
         finally:
             while task.is_alive():
@@ -63,14 +64,15 @@ from dimon._process import ProcessMonitor
 from psutil import Process
 class ProcessTaskTest(unittest.TestCase):
     def test_creation(self):
-        task = ProcessMonitor(0.1)
+        q = Queue()
+        task = ProcessMonitor(q, 0.1)
         pid = os.getpid()
         task.register_task(pid)
         task.start()
         time.sleep(0.1)
         try:
             try:
-                d = task.result_queue.get(block = True, timeout = 1)
+                d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Process monitor did not report anything in 1 seconds")
             threads = d[pid]['get_threads']
@@ -85,7 +87,7 @@ class ProcessTaskTest(unittest.TestCase):
             # The task list is empty, no update should be done
             #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
             try:
-                d = task.result_queue.get(block = True, timeout = 0.1)
+                d = q.get(block = True, timeout = 0.1)
                 self.fail("No data should be put into the queue when task map is empty.")
             except Empty:
                 pass

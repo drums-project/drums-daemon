@@ -6,8 +6,8 @@ Common functions and classes for dimon
 
 # concurrency_impl code taken from : http://stackoverflow.com/a/9252020/1215297
 #concurrency_impl = 'gevent' # single process, single thread
-#concurrency_impl = 'threading' # single process, multiple threads
-concurrency_impl = 'multiprocessing' # multiple processes
+concurrency_impl = 'threading' # single process, multiple threads
+#concurrency_impl = 'multiprocessing' # multiple processes
 
 
 if concurrency_impl == 'gevent':
@@ -31,13 +31,13 @@ def namedtuple_to_dict(nt):
     return {name:getattr(nt, name) for name in nt._fields}
 
 class TaskCommon():
-    def __init__(self, default_interval):
+    def __init__(self, result_queue, default_interval):
         self._default_interval = default_interval
         # TODO: Check the overhead of calling 2 time() per loop
         self._last_loop_time = time.time()
         self._terminate_event = Event()
         self.task_map = dict()
-        self.result_queue = Queue()
+        self.result_queue = result_queue
 
     def __repr__(self):
         name =  self.__class__.__name__
@@ -49,6 +49,8 @@ class TaskCommon():
     def get_interval(self):
         return self._default_interval
 
+    # This is very dangerous, because one Task will remove all pending
+    # Results of itself and all other tasks.
     def flush_result_queue(self):
         #TODO: Check errors?
         while not self.result_queue.empty():
@@ -79,8 +81,8 @@ class TaskCommon():
 
 if concurrency_impl in ['gevent', 'threading']:
     class TaskBase(TaskCommon, Thread):
-        def __init__(self, default_interval, name = ""):
-            TaskCommon.__init__(self, default_interval)
+        def __init__(self, result_queue, default_interval, name = ""):
+            TaskCommon.__init__(self, result_queue, default_interval)
             Thread.__init__(self, target = None, name = name)
             # TODO: Should all tasks be daemons?
             self.daemon = True
@@ -101,7 +103,8 @@ if concurrency_impl in ['gevent', 'threading']:
             try:
                 self._last_loop_time = time.time()
                 while not self._terminate_event.is_set():
-                    self.do()
+                    with self.task_map_lock:
+                        self.do()
                     diff = time.time() - self._last_loop_time
                     sleep_time = self._default_interval - diff
                     try:
@@ -115,8 +118,8 @@ if concurrency_impl in ['gevent', 'threading']:
 
 elif concurrency_impl == 'multiprocessing':
     class TaskBase(TaskCommon, Process):
-        def __init__(self, default_interval, name = ""):
-            TaskCommon.__init__(self, default_interval)
+        def __init__(self, result_queue, default_interval, name = ""):
+            TaskCommon.__init__(self, result_queue, default_interval)
             Process.__init__(self, target = None, name = name)
             # TODO: Should all tasks be daemons?
             self.daemon = True

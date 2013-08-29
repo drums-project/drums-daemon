@@ -21,8 +21,8 @@ def psutil_convert(data):
         return data
 
 class ProcessMonitor(TaskBase):
-    def __init__(self, default_interval, name = "", fields = [], pids = []):
-        TaskBase.__init__(self, default_interval, name)
+    def __init__(self, result_queue, default_interval, name = "", fields = [], pids = []):
+        TaskBase.__init__(self, result_queue, default_interval, name)
         if len(fields) > 0:
             self.fields = fields
         else:
