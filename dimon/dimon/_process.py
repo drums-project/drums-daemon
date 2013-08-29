@@ -6,7 +6,7 @@ Process monitoring daemon
 
 from _common import *
 from psutil import Process
-
+from pprint import pprint
 # TODO: Refactor to Python < 2.7
 # TODO: Write test
 def psutil_convert(data):
@@ -57,7 +57,10 @@ class ProcessMonitor(TaskBase):
             for f in self.fields:
                 attr = getattr(proc, f, None)
                 if callable(attr):
-                    dummy = attr()
+                    if f == "get_cpu_percent":
+                        dummy = attr(0)
+                    else:
+                        dummy = attr()
                 elif attr != None:
                     dummy = str(attr)
                 else:
@@ -70,11 +73,12 @@ class ProcessMonitor(TaskBase):
                 # this code converts namedtuples to dict
                 data[pid][f] = psutil_convert(dummy)
 
-
         if len(data) > 0:
             try:
                 self.result_queue.put(data)
             except Queue.Full:
                 logging.error("[in %s] Output queue is full in"
                     % (self, ))
+            finally:
+                pass#pprint(data)
 

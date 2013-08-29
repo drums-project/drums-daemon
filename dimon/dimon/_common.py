@@ -16,13 +16,19 @@ if concurrency_impl == 'gevent':
 if concurrency_impl in ['gevent', 'threading']:
     #from Queue import Queue as JoinableQueue
     from threading import Thread, Event, Lock
-    from Queue import Queue
+    from Queue import Queue, Empty, Full
 if concurrency_impl == 'multiprocessing':
     from multiprocessing import Process, Queue, Event#, JoinableQueue
+    from Queue import Empty, Full
 
 import sys
 import logging
 import time
+
+# TODO: Refactor to Python < 2.7
+# TODO: Write test
+def namedtuple_to_dict(nt):
+    return {name:getattr(nt, name) for name in nt._fields}
 
 class TaskCommon():
     def __init__(self, default_interval):
@@ -42,6 +48,12 @@ class TaskCommon():
 
     def get_interval(self):
         return self._default_interval
+
+    def flush_result_queue(self):
+        #TODO: Check errors?
+        while not self.result_queue.empty():
+            self.result_queue.get()
+
 
     def terminate(self):
         self._terminate_event.set()
@@ -95,7 +107,7 @@ if concurrency_impl in ['gevent', 'threading']:
                     try:
                         time.sleep(sleep_time)
                     except:
-                        logging.warning("Default interval for `%s` is too small (%s) for the task." % (self.name, self._default_interval))
+                        logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                     self._last_loop_time = time.time()
                 logging.debug("Task %s terminated.", self)
             except:
@@ -143,7 +155,7 @@ elif concurrency_impl == 'multiprocessing':
                     try:
                         time.sleep(sleep_time)
                     except:
-                        logging.warning("Default interval for `%s` is too small (%s) for the task." % (self.name, self._default_interval))
+                        logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                     self._last_loop_time = time.time()
                 logging.debug("Task %s terminated.", self)
             except:
