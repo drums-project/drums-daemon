@@ -121,11 +121,11 @@ class HostTaskTest(unittest.TestCase):
             self.assertGreater(vm['active'], 0)
             task.remove_task('host')
             task.flush_result_queue()
-            time.sleep(0.1)
+            time.sleep(0.25)
             # The task list is empty, no update should be done
             #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
             try:
-                d = q.get(block = True, timeout = 0.1)
+                d = q.get(block = True, timeout = 0.25)
                 self.fail("No data should be put into the queue when task map is empty.")
             except Empty:
                 pass

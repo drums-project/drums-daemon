@@ -61,8 +61,8 @@ class HostMonitor(TaskBase):
             if callable(attr):
                 if f == "cpu_percent":
                     dummy = attr(interval = 0, percpu = True)
-                elif f == ["cpu_times"]:
-                    dummy = attr(percpu = True)
+                elif f == "cpu_times":
+                    dummy = attr(percpu = False)
                 #elif f in ["disk_io_counters", "disk_usage"]:
                     # TODO: Implement this
                 #    continue
@@ -73,6 +73,8 @@ class HostMonitor(TaskBase):
                     dummy = attr(pernic = False)
                 elif f in ["virtual_memory", "swap_memory"]:
                     dummy = attr()
+                else:
+                    continue
             elif attr != None:
                 dummy = str(attr)
             else:
