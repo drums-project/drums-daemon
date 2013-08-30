@@ -30,8 +30,9 @@ class BasicTask(TaskBase):
         sys.stdout.write('>')
         sys.stdout.flush()
         self.task_map = {key:val+1 for key,val in self.task_map.items()}
-        if self.result_queue.empty():
-            self.result_queue.put(self.task_map)
+        #if self.result_queue.empty():
+        #pprint(self.task_map)
+        self.result_queue.put(self.task_map)
 
 class TaskBaseTest(unittest.TestCase):
     def test_loop(self):
@@ -41,16 +42,16 @@ class TaskBaseTest(unittest.TestCase):
         task.start()
         try:
             time.sleep(0.1)
-            d = q.get()
+            d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 1)
             task.register_task('t2')
             time.sleep(0.1)
-            d = q.get()
+            d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 2)
             time.sleep(0.5)
+            d = q.get(); task.flush_result_queue()
             self.assertGreater(d['t1'], 0)
             self.assertGreater(d['t2'], 0)
-            task.flush_result_queue()
             task.remove_task('t2')
             time.sleep(0.1)
             d = q.get()
