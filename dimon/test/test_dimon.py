@@ -12,6 +12,7 @@ import time
 import random
 import os
 import sys
+import signal
 
 from dimon._common import *
 from pprint import pprint
@@ -138,10 +139,11 @@ class HostTaskTest(unittest.TestCase):
 
 from dimon import Dimon
 import subprocess
-class DimonProcessTest(unittest.TestCase):
+class DimonTest(unittest.TestCase):
     def setUp(self):
-        self.flag = False
-        self.flag_another = False
+        self.flag = 0
+        self.flag_another = 0
+        self.flag_host = 0
         self.pid = os.getpid()
         self.d = None
         p = subprocess.Popen(["sleep", "10"])
@@ -149,7 +151,7 @@ class DimonProcessTest(unittest.TestCase):
 
     def test_dimon_pids_callback(self):
         def callback(pid, data):
-            self.flag = True
+            self.flag += 1
             self.assertEqual(pid, self.pid)
             threads = data['get_threads']
             mem = data['get_memory_info']['rss']
@@ -159,28 +161,35 @@ class DimonProcessTest(unittest.TestCase):
             self.assertEqual(name, "python", "Testing app name")
 
         def callback_another(pid, data):
-            self.flag_another = True
+            self.flag_another += 1
             self.assertEqual(pid, self.pid_another)
 
-        self.d = Dimon(process_interval = 0.1)
+        def callback_host(host, data):
+            self.flag_host += 1
+            self.assertGreater(data['swap_memory']['free'], 0)
+
+        self.d = Dimon(process_interval = 0.1, host_interval = 0.5)
         self.d.monitor_pid(self.pid, callback)
         self.d.monitor_pid(self.pid_another, callback_another)
-        time.sleep(0.2)
-        # Flush all data generated so far
-        self.d.flush_result_queue()
-        # Trigger the callbacks with the most fresh one
-        self.d.spin_once()
-        self.assertEqual(self.flag, True)
-        self.assertEqual(self.flag_another, True)
+        self.d.monitor_host(callback_host)
+        for i in range(20):
+            self.d.spin_once()
+
+        #print self.flag, self.flag_another, self.flag_host
+        self.assertGreater(self.flag, 0)
+        self.assertGreater(self.flag_another, 0)
+        self.assertGreater(self.flag_host, 0)
+        self.assertGreater(self.flag, self.flag_host, "Host monitor should have been called less than process monitor")
 
     def tearDown(self):
         self.d.shutdown()
+        os.kill(self.pid_another, signal.SIGKILL)
 
 def get_suite():
     test_suite = unittest.TestSuite()
     test_suite.addTest(unittest.makeSuite(TaskBaseTest))
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
     test_suite.addTest(unittest.makeSuite(HostTaskTest))
-    test_suite.addTest(unittest.makeSuite(DimonProcessTest))
+    test_suite.addTest(unittest.makeSuite(DimonTest))
     return test_suite
 

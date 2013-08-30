@@ -49,17 +49,24 @@ class ProcessMonitor(TaskBase):
             data[pid] = dict()
             for f in self.fields:
                 attr = getattr(proc, f, None)
-                if callable(attr):
-                    if f == "get_cpu_percent":
-                        dummy = attr(0)
+                try:
+                    if callable(attr):
+                        if f == "get_cpu_percent":
+                            dummy = attr(0)
+                        else:
+                            dummy = attr()
+                    elif attr != None:
+                        dummy = str(attr)
                     else:
-                        dummy = attr()
-                elif attr != None:
-                    dummy = str(attr)
-                else:
-                    logging.warning("[in %s] Attribute `%s` not found."
-                        % (self, f))
-                    continue
+                        logging.warning("[in %s] Attribute `%s` not found."
+                            % (self, f))
+                        continue
+                except psutil.NoSuchProcess:
+                    logging.warning("NoSuchProcess for %s, removing it", pid)
+                    self.remove_task(pid)
+                except psutil.AccessDenied:
+                    logging.warning("AccessDenied for %s, removing it", pid)
+                    self.remove_task(pid)
 
                 # This is all about the s**t about pickle is not able
                 # to encode/decode a nested class (used by psutils)
