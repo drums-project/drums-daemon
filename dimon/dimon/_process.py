@@ -5,8 +5,7 @@ Process monitoring daemon
 """
 
 from _common import *
-from psutil import Process
-from pprint import pprint
+import psutil
 # TODO: Refactor to Python < 2.7
 # TODO: Write test
 def psutil_convert(data):
@@ -27,7 +26,7 @@ class ProcessMonitor(TaskBase):
         for p in list(set(pids)):
             self.register_task(p)
 
-    def set_fields(self):
+    def set_fields(self, fields):
         if len(fields) > 0:
             self.fields = list(set(fields))
         else:
@@ -39,18 +38,21 @@ class ProcessMonitor(TaskBase):
         Adds a pid to the task_map
         """
         try:
-            self.task_map[task] = Process(task)
-        except:
-            logging.error("[in %s] Error adding PID `%s`"
+            logging.debug("Registering pid: %s" % (task,))
+            self.task_map[task] = psutil.Process(task)
+        except psutil.NoSuchProcess:
+            logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
+                % (self, task))
+        except psutil.AccessDenied:
+            logging.error("[in %s] Error adding PID (AccessDenied) `%s`"
                 % (self, task))
 
     def remove_task_core(self, task):
         try:
             del self.task_map[task]
-        except:
+        except KeyError:
             logging.warning("[in %s] Error removing PID `%s`"
                 % (self, task))
-
 
     def do(self):
         data = dict()

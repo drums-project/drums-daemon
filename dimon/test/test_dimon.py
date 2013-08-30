@@ -98,9 +98,28 @@ class ProcessTaskTest(unittest.TestCase):
                 time.sleep(0.1)
             task.join()
 
+from dimon import Dimon
+class DimonProcessTest(unittest.TestCase):
+    def setUp(self):
+        self.flag = False
+        self.pid = os.getpid()
+        self.d = None
+
+    def test_pid(self):
+        def callback(pid, data):
+            self.assertEqual(pid, self.pid)
+
+        self.d = Dimon(process_interval = 0.1)
+        self.d.monitor_pid(self.pid, callback)
+        self.d.spin_once()
+
+    def tearDown(self):
+        self.d.shutdown()
+
 def get_suite():
     test_suite = unittest.TestSuite()
-    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    test_suite.addTest(unittest.makeSuite(DimonProcessTest))
     return test_suite
 

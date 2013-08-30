@@ -6,6 +6,7 @@
 __version__ = "0.1.0"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
+from _common import *
 from _process import ProcessMonitor
 
 class Dimon():
@@ -35,6 +36,7 @@ class Dimon():
 
     def _create_sock_monitor(self):
         if self.proc == None:
+            logging.debug("Creating a ProcessMonitor object")
             self.proc = ProcessMonitor(self.q, self.process_interval,
              "dimon_processmonitor", self.process_fields)
             self.proc.start()
@@ -52,7 +54,7 @@ class Dimon():
     def monitor_pid(self, pid, callback):
         self._create_sock_monitor()
         self.proc.register_task(pid)
-        callback_map[pid] = callback
+        self.callback_map[pid] = callback
 
     def remove_pid(self, pid):
         self.proc.remove_task(pid)
@@ -66,17 +68,28 @@ class Dimon():
                 self._shutdown_monitor(self.proc)
                 self.proc = None
 
-    # TODO: Break into phases
+    def shutdown(self):
+        logging.info("Shutting down all active monitors")
+        if not self.proc == None:
+            self._shutdown_monitor(self.proc)
+
+    def spin_once(self):
+        # results are dicts, keys are tasks
+        data_pair = self.q.get()
+        assert len(data_pair.keys()) == 1
+        task = data_pair.keys()[0]
+        data = data_pair[task]
+        try:
+            self.callback_map[task](task, data)
+        except KeyError:
+            logging.error("Error calling callback for task=%s"
+                % (task,))
+
     def spin(self):
         self.running = True
         while True:
-            # results are dicts, keys are tasks
-            task, data = self.q.join()
-            try:
-                self.callback_map[task](task, data)
-            except KeyError:
-                logging.error("Error calling callback for task=%s"
-                    % (task,))
+            self.spin_once()
+
 
 
 
