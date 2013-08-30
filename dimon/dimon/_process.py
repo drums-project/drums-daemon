@@ -19,6 +19,7 @@ def psutil_convert(data):
     else:
         return data
 
+# TODO: Filter out input pids for positive integers only
 class ProcessMonitor(TaskBase):
     def __init__(self, result_queue, default_interval, name = "", fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
