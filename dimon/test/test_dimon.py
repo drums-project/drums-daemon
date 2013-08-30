@@ -27,7 +27,8 @@ class BasicTask(TaskBase):
         del self.task_map[task]
 
     def do(self):
-        print "beep"
+        sys.stdout.write('>')
+        sys.stdout.flush()
         self.task_map = {key:val+1 for key,val in self.task_map.items()}
         if self.result_queue.empty():
             self.result_queue.put(self.task_map)
@@ -108,6 +109,12 @@ class DimonProcessTest(unittest.TestCase):
     def test_pid(self):
         def callback(pid, data):
             self.assertEqual(pid, self.pid)
+            threads = data['get_threads']
+            mem = data['get_memory_info']['rss']
+            name = data['name']
+            self.assertGreater(len(threads), 0, "Testing number of threads")
+            self.assertGreater(mem, 0, "Testing memory")
+            self.assertEqual(name, "python", "Testing app name")
 
         self.d = Dimon(process_interval = 0.1)
         self.d.monitor_pid(self.pid, callback)
@@ -118,8 +125,8 @@ class DimonProcessTest(unittest.TestCase):
 
 def get_suite():
     test_suite = unittest.TestSuite()
-    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
     test_suite.addTest(unittest.makeSuite(DimonProcessTest))
     return test_suite
 
