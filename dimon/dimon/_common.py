@@ -29,6 +29,20 @@ import time
 def namedtuple_to_dict(nt):
     return {name:getattr(nt, name) for name in nt._fields}
 
+# TODO: Refactor to Python < 2.7
+# TODO: Write test
+def psutil_convert(data):
+    if isinstance(data, tuple):
+        return namedtuple_to_dict(data)
+    elif type(data) is list:
+        if isinstance(data[0], tuple):
+            return [namedtuple_to_dict(d) for d in data]
+        else:
+            # TODO: Why not just return the list?
+            return data
+    else:
+        return data
+
 class TaskCommon():
     def __init__(self, result_queue, default_interval):
         self._default_interval = default_interval

@@ -6,18 +6,6 @@ Process monitoring daemon
 
 from _common import *
 import psutil
-# TODO: Refactor to Python < 2.7
-# TODO: Write test
-def psutil_convert(data):
-    if isinstance(data, tuple):
-        return namedtuple_to_dict(data)
-    elif type(data) is list:
-        if isinstance(data[0], tuple):
-            return [namedtuple_to_dict(d) for d in data]
-        else:
-            return dict(data)
-    else:
-        return data
 
 # TODO: Filter out input pids for positive integers only
 class ProcessMonitor(TaskBase):

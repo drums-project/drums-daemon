@@ -6,18 +6,7 @@ Host monitoring daemon
 
 from _common import *
 import psutil
-# TODO: Refactor to Python < 2.7
-# TODO: Write test
-def psutil_convert(data):
-    if isinstance(data, tuple):
-        return namedtuple_to_dict(data)
-    elif type(data) is list:
-        if isinstance(data[0], tuple):
-            return [namedtuple_to_dict(d) for d in data]
-        else:
-            return dict(data)
-    else:
-        return data
+from pprint import pprint
 
 class HostMonitor(TaskBase):
     def __init__(self, result_queue, default_interval, name = "", fields = [], pids = []):
@@ -31,9 +20,19 @@ class HostMonitor(TaskBase):
             self.fields = list(set(fields))
         else:
             # TODO: why does get_boot_time() throw exception?
-            self.fields = ['cpu_percent', 'cpu_times',
-            'virtual_memory','swap_memory', 'disk_usage'
+            self.fields = ['BOOT_TIME', 'cpu_percent', 'cpu_times',
+            'virtual_memory','swap_memory', 'disk_usage',
             'disk_io_counters', 'net_io_counters']
+
+            # I hate these version compatibility hack!
+            # Even on Ubuntu 13.04, python-psutil point to 0.6
+            # while latest version is 1.1 !
+
+            # TODO change fields to dict {attr: psutil function}
+            self.net_hack = psutil.version_info < (1, 1, 0)
+            if self.net_hack:
+                self.fields.append('network_io_counters')
+
 
     def register_task_core(self, task):
         """
@@ -58,27 +57,36 @@ class HostMonitor(TaskBase):
         for f in self.fields:
             # Due to lots of variation in function calls, it is better
             # to rewrite the code from _process.py
-            attr = getattr(proc, f, None)
+            attr = getattr(psutil, f, None)
             if callable(attr):
                 if f == "cpu_percent":
                     dummy = attr(interval = 0, percpu = True)
                 elif f == ["cpu_times"]:
                     dummy = attr(percpu = True)
-                elif f in ["disk_io_counters", "disk_usage"]:
+                #elif f in ["disk_io_counters", "disk_usage"]:
                     # TODO: Implement this
-                    dummy = []
-                elif f == "net_io_counters":
-                    dummy = attr(pernic = True)
+                #    continue
+                elif f in ["net_io_counters", "network_io_counters"]:
+                    # TODO: pernic=True returns a dict to tuples
+                    # which psutil_convert() function does not to know
+                    # how to convert it yet
+                    dummy = attr(pernic = False)
+                elif f in ["virtual_memory", "swap_memory"]:
+                    dummy = attr()
             elif attr != None:
                 dummy = str(attr)
             else:
-                logging.warning("[in %s] Attribute `%s` not found."
+                logging.debug("[in %s] Attribute `%s` not found."
                     % (self, f))
                 continue
 
             # This is all about the s**t about pickle is not able
             # to encode/decode a nested class (used by psutils)
             # this code converts namedtuples to dict
+            #pprint(dummy)
+            if self.net_hack and f == 'network_io_counters':
+                f = 'net_io_counters'
+
             data['host'][f] = psutil_convert(dummy)
 
         if len(data) > 0:

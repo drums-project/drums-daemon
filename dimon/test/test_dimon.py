@@ -35,7 +35,7 @@ class BasicTask(TaskBase):
         self.result_queue.put(self.task_map)
 
 class TaskBaseTest(unittest.TestCase):
-    def test_loop(self):
+    def test_basic_task_loop(self):
         q = Queue()
         task = BasicTask(q, 0.1)
         task.register_task('t1')
@@ -65,7 +65,7 @@ class TaskBaseTest(unittest.TestCase):
 from dimon._process import ProcessMonitor
 from psutil import Process
 class ProcessTaskTest(unittest.TestCase):
-    def test_creation(self):
+    def test_process_creation(self):
         q = Queue()
         task = ProcessMonitor(q, 0.1)
         pid = os.getpid()
@@ -103,7 +103,7 @@ class ProcessTaskTest(unittest.TestCase):
 from dimon._host import HostMonitor
 import psutil
 class HostTaskTest(unittest.TestCase):
-    def test_creation(self):
+    def test_host_creation(self):
         q = Queue()
         task = HostMonitor(q, 0.1)
         task.register_task(None)
@@ -114,8 +114,11 @@ class HostTaskTest(unittest.TestCase):
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Host monitor did not report anything in 1 seconds")
-            read_count = d['host']['disk_io_counters']['read_count']
-            self.assertGreater(read_count, 0, "System disk read count")
+            #pprint(d)
+            net_count = d['host']['net_io_counters']
+            vm = d['host']['virtual_memory']
+            self.assertGreater(len(net_count), 0, "net_io_counter type test")
+            self.assertGreater(vm['active'], 0)
             task.remove_task('host')
             task.flush_result_queue()
             time.sleep(0.1)
@@ -144,7 +147,7 @@ class DimonProcessTest(unittest.TestCase):
         p = subprocess.Popen(["sleep", "10"])
         self.pid_another = p.pid
 
-    def test_pid(self):
+    def test_dimon_pids_callback(self):
         def callback(pid, data):
             self.flag = True
             self.assertEqual(pid, self.pid)
