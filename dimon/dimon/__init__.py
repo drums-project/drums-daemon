@@ -8,7 +8,7 @@ version_info = tuple([int(num) for num in __version__.split('.')])
 
 from _common import *
 from _process import ProcessMonitor
-
+from pprint import pprint
 class Dimon():
     def __init__(self, process_interval = 1, host_interval = 1,
         socket_interval = 1, process_fields = [], host_fields = []):
@@ -27,6 +27,11 @@ class Dimon():
         self.sock = None
 
         self.callback_map = dict()
+
+    def flush_result_queue(self):
+        #TODO: Check errors?
+        while not self.q.empty():
+            self.q.get()
 
     def _shutdown_monitor(self, mon):
         while mon.is_alive():
@@ -75,15 +80,13 @@ class Dimon():
 
     def spin_once(self):
         # results are dicts, keys are tasks
-        data_pair = self.q.get()
-        assert len(data_pair.keys()) == 1
-        task = data_pair.keys()[0]
-        data = data_pair[task]
-        try:
-            self.callback_map[task](task, data)
-        except KeyError:
-            logging.error("Error calling callback for task=%s"
-                % (task,))
+        data_pair_dict = self.q.get()
+        for task, data in data_pair_dict.items():
+            try:
+                self.callback_map[task](task, data)
+            except KeyError:
+                logging.error("Error calling callback for task=%s"
+                    % (task,))
 
     def spin(self):
         self.running = True

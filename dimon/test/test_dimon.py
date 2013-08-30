@@ -100,14 +100,19 @@ class ProcessTaskTest(unittest.TestCase):
             task.join()
 
 from dimon import Dimon
+import subprocess
 class DimonProcessTest(unittest.TestCase):
     def setUp(self):
         self.flag = False
+        self.flag_another = False
         self.pid = os.getpid()
         self.d = None
+        p = subprocess.Popen(["sleep", "10"])
+        self.pid_another = p.pid
 
     def test_pid(self):
         def callback(pid, data):
+            self.flag = True
             self.assertEqual(pid, self.pid)
             threads = data['get_threads']
             mem = data['get_memory_info']['rss']
@@ -116,9 +121,20 @@ class DimonProcessTest(unittest.TestCase):
             self.assertGreater(mem, 0, "Testing memory")
             self.assertEqual(name, "python", "Testing app name")
 
+        def callback_another(pid, data):
+            self.flag_another = True
+            self.assertEqual(pid, self.pid_another)
+
         self.d = Dimon(process_interval = 0.1)
         self.d.monitor_pid(self.pid, callback)
+        self.d.monitor_pid(self.pid_another, callback_another)
+        time.sleep(0.2)
+        # Flush all data generated so far
+        self.d.flush_result_queue()
+        # Trigger the callbacks with the most fresh one
         self.d.spin_once()
+        self.assertEqual(self.flag, True)
+        self.assertEqual(self.flag_another, True)
 
     def tearDown(self):
         self.d.shutdown()
