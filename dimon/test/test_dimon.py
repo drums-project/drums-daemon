@@ -100,6 +100,39 @@ class ProcessTaskTest(unittest.TestCase):
                 time.sleep(0.1)
             task.join()
 
+from dimon._host import HostMonitor
+import psutil
+class HostTaskTest(unittest.TestCase):
+    def test_creation(self):
+        q = Queue()
+        task = HostMonitor(q, 0.1)
+        task.register_task(None)
+        task.start()
+        time.sleep(0.1)
+        try:
+            try:
+                d = q.get(block = True, timeout = 1)
+            except Empty:
+                self.fail("Host monitor did not report anything in 1 seconds")
+            read_count = d['host']['disk_io_counters']['read_count']
+            self.assertGreater(read_count, 0, "System disk read count")
+            task.remove_task('host')
+            task.flush_result_queue()
+            time.sleep(0.1)
+            # The task list is empty, no update should be done
+            #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
+            try:
+                d = q.get(block = True, timeout = 0.1)
+                self.fail("No data should be put into the queue when task map is empty.")
+            except Empty:
+                pass
+
+        finally:
+            while task.is_alive():
+                task.terminate()
+                time.sleep(0.1)
+            task.join()
+
 from dimon import Dimon
 import subprocess
 class DimonProcessTest(unittest.TestCase):
@@ -144,6 +177,7 @@ def get_suite():
     test_suite = unittest.TestSuite()
     test_suite.addTest(unittest.makeSuite(TaskBaseTest))
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    test_suite.addTest(unittest.makeSuite(HostTaskTest))
     test_suite.addTest(unittest.makeSuite(DimonProcessTest))
     return test_suite
 
