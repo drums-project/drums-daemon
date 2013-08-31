@@ -46,7 +46,7 @@ class HostMonitor(TaskBase):
         try:
             del self.task_map['host']
         except KeyError:
-            logging.warning("[in %s] Error removing host")
+            logging.warning("Error removing host")
 
     def do(self):
         data = dict()
@@ -68,12 +68,13 @@ class HostMonitor(TaskBase):
                 #    continue
                 elif f in ["net_io_counters", "network_io_counters"]:
                     # TODO: pernic=True returns a dict to tuples
-                    # which psutil_convert() function does not to know
+                    # which psutil_convert() function does not know
                     # how to convert it yet
                     dummy = attr(pernic = False)
                 elif f in ["virtual_memory", "swap_memory"]:
                     dummy = attr()
                 else:
+                    # Not supported yet
                     continue
             elif attr != None:
                 dummy = str(attr)
