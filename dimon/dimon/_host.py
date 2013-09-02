@@ -92,7 +92,7 @@ class HostMonitor(TaskBase):
 
             data['host'][f] = psutil_convert(dummy)
 
-        if len(data) > 0:
+        if data:
             try:
                 self.result_queue.put(data)
             except Queue.Full:

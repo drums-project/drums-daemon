@@ -16,7 +16,7 @@ class ProcessMonitor(TaskBase):
             self.register_task(p)
 
     def set_fields(self, fields):
-        if len(fields) > 0:
+        if fields:
             self.fields = list(set(fields))
         else:
             self.fields = ['name', 'status','get_cpu_percent', 'get_cpu_times',
@@ -73,7 +73,7 @@ class ProcessMonitor(TaskBase):
                 # this code converts namedtuples to dict
                 data[pid][f] = psutil_convert(dummy)
 
-        if len(data) > 0:
+        if data:
             try:
                 self.result_queue.put(data)
             except Queue.Full:
