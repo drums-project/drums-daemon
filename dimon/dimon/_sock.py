@@ -7,7 +7,7 @@ Socket monitoring daemon
 from _common import *
 
 import pcapy
-from impacket import ImpacktDecoder, ImpacktPacket
+from impacket import ImpactDecoder, ImpactPacket
 from pprint import pprint
 
 """
@@ -45,6 +45,7 @@ def populate_data(data, port, len):
 class SocketMonitor(TaskBase):
     def __init__(self, result_queue, default_interval, inet, name = ""):
         TaskBase.__init__(self, result_queue, default_interval, name)
+        self.inet = inet
 
         # TODO: suid
         self.pc = pcapy.open_live(self.inet, 1514, False, 100)
@@ -79,6 +80,7 @@ class SocketMonitor(TaskBase):
         except KeyError:
             logging.warning("Error removing socket filter: %s" % (task,))
 
+    # TODO: Check if re-implementing the IMPacket would improve performance
     def process_callback(self, hdr , data):
         self.packets_per_callback += 1
 
