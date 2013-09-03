@@ -59,15 +59,18 @@ class SocketMonitor(TaskBase):
         else:
             raise Exception("Datalink type not supported: %s" % datalink)
 
-        self.pc.filter = ""
+        self.filter_str = ""
         self.packets_per_callback = 0
-
+        self.data = dict()
+        self.data['tcp'] = dict()
+        self.data['udp'] = dict()
 
     def update_filters(self):
         filters = ["(%s)" % (f,) for f in self.task_map.keys()]
-        self.pc.filter = " or ".join(filters)
-        logging.debug("Updating pcap filter to `%s`" % (self.pc.filter))
-        self.pc.setfilter(self.pc.filter)
+        self.filter_str = " or ".join(filters)
+        logging.debug("Updating pcap filter to `%s`" % (self.filter_str,))
+        print "Setting filter to %s" % self.filter_str
+        self.pc.setfilter(self.filter_str)
 
 
     def register_task_core(self, task):
@@ -77,46 +80,44 @@ class SocketMonitor(TaskBase):
     def remove_task_core(self, task):
         try:
             del self.task_map[tasktuple_to_filterstr(task)]
+            self.update_filters()
         except KeyError:
             logging.warning("Error removing socket filter: %s" % (task,))
 
-    # TODO: Check if re-implementing the IMPacket would improve performance
-    def process_callback(self, hdr , data):
-        self.packets_per_callback += 1
-
-        #packet_ts = float(hdr.getts()[0]) + float(hdr.getts()[1]) * 1.0e-6
-
-        # getcaplen() is equal to the length of the part of the packet that has been captured, not the total length of the packet, thus should never be used for bw calculation
-
-        packet_len = hdr.getlen()
-
-        # Link layer decoder
-        packet = self.decoder.decode(data)
-        # Get the higher layer packet (ip:datalink)
-        ippacket = packet.child()
-        # TCP or UDP?
-        tpacket = ippacket.child()
-        if isinstance(tpacket, ImpactPacket.TCP):
-            populate_data(self.data['tcp'], tpacket.get_th_sport(), packet_len)
-            populate_data(self.data['tcp'], tpacket.get_th_dport(), packet_len)
-        elif isinstance(tpacket, ImpactPacket.UDP):
-            populate_data(self.data['udp'], tpacket.get_uh_sport(), packet_len)
-            populate_data(self.data['udp'], tpacket.get_uh_dport(), packet_len)
-
     def do(self):
+        # TODO: Check if re-implementing the IMPacket would improve performance
+        def process_callback(hdr , packetdata):
+            self.packets_per_callback += 1
+
+            #packet_ts = float(hdr.getts()[0]) + float(hdr.getts()[1]) * 1.0e-6
+
+            # getcaplen() is equal to the length of the part of the packet that has been captured, not the total length of the packet, thus should never be used for bw calculation
+
+            packet_len = hdr.getlen()
+
+            # Link layer decoder
+            packet = self.decoder.decode(packetdata)
+            # Get the higher layer packet (ip:datalink)
+            ippacket = packet.child()
+            # TCP or UDP?
+            tpacket = ippacket.child()
+            if isinstance(tpacket, ImpactPacket.TCP):
+                populate_data(self.data['tcp'], tpacket.get_th_sport(), packet_len)
+                populate_data(self.data['tcp'], tpacket.get_th_dport(), packet_len)
+            elif isinstance(tpacket, ImpactPacket.UDP):
+                populate_data(self.data['udp'], tpacket.get_uh_sport(), packet_len)
+                populate_data(self.data['udp'], tpacket.get_uh_dport(), packet_len)
+
         if not self.task_map:
             return
 
-        self.data = dict()
-        self.data['tcp'] = dict()
-        self.data['udp'] = dict()
         self.packets_per_callback = 0
-        self.pc.dispatch(0, self.process_callback)
-        self.data['__ppc__'] = packets_per_callback
-        if packets_per_callback > 0:
+        self.pc.dispatch(0, process_callback)
+        self.data['__ppc__'] = self.packets_per_callback
+        if self.packets_per_callback > 0:
             try:
-                self.result_queue.put(data)
-            except Queue.Full:
+                self.result_queue.put(self.data)
+            except Full:
                 logging.error("[in %s] Output queue is full in"
                     % (self, ))
             finally:

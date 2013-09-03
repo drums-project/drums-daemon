@@ -137,7 +137,7 @@ class HostTaskTest(unittest.TestCase):
                 time.sleep(0.1)
             task.join()
 
-from dimon._socket import SockMonitor
+from dimon._sock import SocketMonitor
 import subprocess
 import socket
 
@@ -145,27 +145,43 @@ class SocketTaskTest(unittest.TestCase):
     def setUp(self):
         self.p_list = list()
         # write socket for this as well
-        self.p_list.append(subprocess.Popen(["netcat", "-l", "3333"]))
+        self.null = open(os.devnull, 'w')
+        self.p_list.append(subprocess.Popen(["netcat", "-l", "3333"], stdout = self.null, stderr = self.null))
+        self.p_list.append(subprocess.Popen(["netcat", "-ul", "4444"], stdout = self.null, stderr = self.null))
+        time.sleep(0.1)
         self.s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s1.connect(("localhost", 3333))
+        self.s2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.s2.connect(("localhost", 4444))
 
     def test_socket_basic(self):
         q = Queue()
-        task = SocketMonitor(q, 0.5, "any")
-        t = ("tcp", "dst", "3333")
-        task.register_task(t)
+        task = SocketMonitor(q, 0.5, "lo")
+        t1 = ("tcp", "", "3333")
+        t2 = ("udp", "", "4444")
+        task.register_task(t2)
+        task.register_task(t1)
         task.start()
-        dummy = [1] * 1024
+        time.sleep(1.0)
+        dummy = "m" * 10
         self.s1.sendall(dummy)
+        self.s2.sendall(dummy)
         try:
             try:
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Socket monitor did not report anything in 1 seconds")
-            #pprint(d)
-            byte_count = d['tcp']['dst'][3333]
-            self.assertGreater(byte_count, 0, "Bytes captured")
-            task.remove_task(t)
+            pprint(d)
+            byte_count = d['tcp'][3333]
+            #print "Byte Count: %s" % byte_count
+            self.assertGreater(byte_count, 10, "Bytes captured should be greater than 1KiB")
+
+            byte_count = d['udp'][4444]
+            #print "Byte Count: %s" % byte_count
+            self.assertGreater(byte_count, 10, "Bytes captured should be greater than 1KiB")
+
+            task.remove_task(t1)
+            task.remove_task(t2)
             task.flush_result_queue()
             time.sleep(0.25)
             # The task list is empty, no update should be done
@@ -183,9 +199,11 @@ class SocketTaskTest(unittest.TestCase):
             task.join()
 
     def tearDown(self):
+        self.null.close()
         self.s1.close()
+        self.s2.close()
         for p in self.p_list:
-            os.kill(p, signal.SIGKILL)
+            p.terminate()
 
 
 from dimon import Dimon
@@ -237,10 +255,10 @@ class DimonTest(unittest.TestCase):
 
 def get_suite():
     test_suite = unittest.TestSuite()
-    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
-    test_suite.addTest(unittest.makeSuite(HostTaskTest))
+    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    #test_suite.addTest(unittest.makeSuite(HostTaskTest))
     test_suite.addTest(unittest.makeSuite(SocketTaskTest))
-    test_suite.addTest(unittest.makeSuite(DimonTest))
+    #test_suite.addTest(unittest.makeSuite(DimonTest))
     return test_suite
 
