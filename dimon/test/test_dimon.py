@@ -139,42 +139,56 @@ class HostTaskTest(unittest.TestCase):
 
 from dimon._sock import SocketMonitor
 import subprocess
-import socket
+import shlex
 
 class SocketTaskTest(unittest.TestCase):
     def setUp(self):
         self.p_list = list()
         # write socket for this as well
-        self.null = open(os.devnull, 'w')
-        self.p_list.append(subprocess.Popen(["netcat", "-l", "3333"], stdout = self.null, stderr = self.null))
-        self.p_list.append(subprocess.Popen(["netcat", "-ul", "4444"], stdout = self.null, stderr = self.null))
-        time.sleep(0.1)
-        self.s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s1.connect(("localhost", 3333))
-        self.s2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.s2.connect(("localhost", 4444))
+        #self.null = open(os.devnull, 'w')
+        #self.p1 = os.pipe()
+        #self.p2 = os.pipe()
+
+        cmds = list()
+        cmds.append("netcat -l -p 3333 > /dev/null")
+        cmds.append("netcat -l -u -p 4444 > /dev/null")
+        cmds.append("netcat localhost 3333 < /dev/urandom")
+        cmds.append("netcat -u localhost 4444 < /dev/urandom")
+
+        # Process Groups are needed in order to properly kill the netcats running on a spawned shell, from: http://stackoverflow.com/a/4791612/1215297
+        for c in cmds:
+            self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
+            time.sleep(0.1)
+
+        # self.p_list.append(subprocess.Popen(["netcat", "-l", "3333"], stdout = self.null, stderr = self.null))
+        # self.p_list.append(subprocess.Popen(["netcat", "3333"], stdin = self.p1, stdout = self.null, stderr = self.null))
+        # self.p_list.append(subprocess.Popen(["cat", "/dev/urandom"], stdout = self.p1))
+
+        # self.p_list.append(subprocess.Popen(["netcat", "-ul", "4444"], stdout = self.null, stderr = self.null))
+        # self.p_list.append(subprocess.Popen(["netcat", "-u", "3333"], stdin = self.p2, stdout = self.null, stderr = self.null))
+        # self.p_list.append(subprocess.Popen(["cat", "/dev/urandom"], stdout = self.p2))
+
+        #time.sleep(0.1)
 
     def test_socket_basic(self):
         q = Queue()
         task = SocketMonitor(q, 0.5, "lo")
-        t1 = ("tcp", "", "3333")
-        t2 = ("udp", "", "4444")
+        t1 = ("tcp", "dst", "3333")
+        t2 = ("udp", "dst", "4444")
         task.register_task(t2)
         task.register_task(t1)
         task.start()
-        dummy = "m" * 1024
-        self.s1.sendall(dummy)
-        self.s2.sendall(dummy)
+        # Wait some time until all packets get captured,
+        # threaded mode needs more time
+        #task.flush_result_queue()
 
-        # Wait some time until all packets get captured
-        task.flush_result_queue()
-        time.sleep(0.5)
         try:
             try:
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Socket monitor did not report anything in 1 seconds")
-
+            time.sleep(0.5)
+            d = q.get()
             pprint(d)
             byte_count = d['tcp'][3333]
             #print "Byte Count: %s" % byte_count
@@ -203,11 +217,9 @@ class SocketTaskTest(unittest.TestCase):
             task.join()
 
     def tearDown(self):
-        self.null.close()
-        self.s1.close()
-        self.s2.close()
+        #self.null.close()
         for p in self.p_list:
-            p.terminate()
+            os.killpg(p.pid, signal.SIGTERM)
 
 
 from dimon import Dimon

@@ -34,13 +34,13 @@ def tasktuple_to_filterstr(task):
     if not port > 0:
         raise ValueError("[in %s] Invalid port number %s" % (self, port))
 
-    return "%s %s port %s" % (proto, direction, port)
+    return (proto, direction, port, "%s %s port %s" % (proto, direction, port))
 
 def populate_data(data, port, len):
     if port in data:
         data[port] += len
-    else:
-        data[port] = len
+    #else:
+    #    data[port] = len
 
 class SocketMonitor(TaskBase):
     def __init__(self, result_queue, default_interval, inet, name = ""):
@@ -74,12 +74,16 @@ class SocketMonitor(TaskBase):
 
 
     def register_task_core(self, task):
-        self.task_map[tasktuple_to_filterstr(task)] = True
+        proto, direction, port, filter_str = tasktuple_to_filterstr(task)
+        self.task_map[filter_str] = True
+        self.data[proto][port] = 0
         self.update_filters()
 
     def remove_task_core(self, task):
         try:
-            del self.task_map[tasktuple_to_filterstr(task)]
+            proto, direction, port, filter_str = tasktuple_to_filterstr(task)
+            del self.task_map[filter_str]
+            del self.data[proto][port]
             self.update_filters()
         except KeyError:
             logging.warning("Error removing socket filter: %s" % (task,))
@@ -101,6 +105,10 @@ class SocketMonitor(TaskBase):
             ippacket = packet.child()
             # TCP or UDP?
             tpacket = ippacket.child()
+            # It is not possible now to determine which part of the filter string
+            # caused the callback to fire. So `tcp dst port 80` or `tcp src port 80`
+            # are not distinguishable. The hack here is to cache the port numbers only
+            # and see which port address field matches the cached list.
             if isinstance(tpacket, ImpactPacket.TCP):
                 populate_data(self.data['tcp'], tpacket.get_th_sport(), packet_len)
                 populate_data(self.data['tcp'], tpacket.get_th_dport(), packet_len)
