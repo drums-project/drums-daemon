@@ -157,7 +157,8 @@ elif concurrency_impl == 'multiprocessing':
             try:
                 self._last_loop_time = time.time()
                 while not self._terminate_event.is_set():
-                    if not self.cmd_queue.empty():
+                    # Process command queue
+                    while not self.cmd_queue.empty():
                         cmd, task = self.cmd_queue.get()
                         if cmd == 'a':
                             self.register_task_core(task)
