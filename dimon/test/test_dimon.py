@@ -162,23 +162,27 @@ class SocketTaskTest(unittest.TestCase):
         task.register_task(t2)
         task.register_task(t1)
         task.start()
-        time.sleep(1.0)
-        dummy = "m" * 10
+        dummy = "m" * 1024
         self.s1.sendall(dummy)
         self.s2.sendall(dummy)
+
+        # Wait some time until all packets get captured
+        task.flush_result_queue()
+        time.sleep(0.5)
         try:
             try:
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Socket monitor did not report anything in 1 seconds")
+
             pprint(d)
             byte_count = d['tcp'][3333]
             #print "Byte Count: %s" % byte_count
-            self.assertGreater(byte_count, 10, "Bytes captured should be greater than 1KiB")
+            self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
             byte_count = d['udp'][4444]
             #print "Byte Count: %s" % byte_count
-            self.assertGreater(byte_count, 10, "Bytes captured should be greater than 1KiB")
+            self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
             task.remove_task(t1)
             task.remove_task(t2)
@@ -255,10 +259,10 @@ class DimonTest(unittest.TestCase):
 
 def get_suite():
     test_suite = unittest.TestSuite()
-    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
-    #test_suite.addTest(unittest.makeSuite(HostTaskTest))
+    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    test_suite.addTest(unittest.makeSuite(HostTaskTest))
     test_suite.addTest(unittest.makeSuite(SocketTaskTest))
-    #test_suite.addTest(unittest.makeSuite(DimonTest))
+    test_suite.addTest(unittest.makeSuite(DimonTest))
     return test_suite
 

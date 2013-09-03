@@ -107,11 +107,11 @@ class SocketMonitor(TaskBase):
             elif isinstance(tpacket, ImpactPacket.UDP):
                 populate_data(self.data['udp'], tpacket.get_uh_sport(), packet_len)
                 populate_data(self.data['udp'], tpacket.get_uh_dport(), packet_len)
-
         if not self.task_map:
             return
 
         self.packets_per_callback = 0
+        # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
         self.data['__ppc__'] = self.packets_per_callback
         if self.packets_per_callback > 0:
