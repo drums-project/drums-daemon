@@ -122,9 +122,13 @@ class SocketMonitor(TaskBase):
         # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
         self.data['__ppc__'] = self.packets_per_callback
+
+        _data = dict()
+        _data['sock'] = self.data
+        pprint(_data)
         if self.packets_per_callback > 0:
             try:
-                self.result_queue.put(self.data)
+                self.result_queue.put(_data)
             except Full:
                 logging.error("[in %s] Output queue is full in"
                     % (self, ))

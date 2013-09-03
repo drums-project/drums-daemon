@@ -4,7 +4,7 @@
 Common functions and classes for dimon
 """
 
-# concurrency_impl code taken from : http://stackoverflow.com/a/9252020/1215297
+# idea from : http://stackoverflow.com/a/9252020/1215297
 #concurrency_impl = 'gevent' # single process, single thread
 #concurrency_impl = 'threading' # single process, multiple threads
 concurrency_impl = 'multiprocessing' # multiple processes

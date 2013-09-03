@@ -9,6 +9,7 @@ version_info = tuple([int(num) for num in __version__.split('.')])
 from _common import *
 from _process import ProcessMonitor
 from _host import HostMonitor
+from _sock import SocketMonitor
 
 from pprint import pprint
 class Dimon():
@@ -20,6 +21,7 @@ class Dimon():
         self.socket_interval = socket_interval
         self.process_fields = process_fields
         self.host_fields = host_fields
+        self.socket_inet = "any"
 
         self.running = False
 
@@ -54,6 +56,12 @@ class Dimon():
             self.host = HostMonitor(self.q, self.host_interval,
              "dimon_hostmonitor", self.host_fields)
             self.host.start()
+    def _create_socket_monitor(self):
+        if self.sock == None:
+            logging.debug("Creating a SocketMonitor object")
+            self.sock = SocketMonitor(self.q, self.socket_interval,
+             self.socket_inet, "dimon_socketmonitor")
+            self.sock.start()
 
     def set_process_interval(self, interval):
         self.process_interval = interval
@@ -75,6 +83,11 @@ class Dimon():
         if not self.host == None:
             self.host.set_fields(self.host_fields)
 
+    def set_sock_interval(self, interval):
+        self.socket_interval = interval
+        if not self.sock == None:
+            self.sock.set_interval(self.sock_interval)
+
     def monitor_pid(self, pid, callback):
         self._create_proc_monitor()
         self.proc.register_task(pid)
@@ -85,6 +98,19 @@ class Dimon():
         # TODO: Change 'host' to variable key
         self.host.register_task('host')
         self.callback_map['host'] = callback
+
+    def create_monitor_socket(self, callback, inet = "any"):
+        self.socket_inet = inet
+        self._create_socket_monitor()
+        self.callback_map['sock'] = callback
+
+    def add_socket_to_monitor(self, sock):
+        """
+        sock: tuple("tcp/udp", "src/dst/''", port number)
+        """
+        if self.sock == None:
+            raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
+        self.sock.register_task(sock)
 
     def remove_host(self):
         self.host.remove_task('host')
@@ -111,6 +137,11 @@ class Dimon():
             #    self._shutdown_monitor(self.proc)
             #    self.proc = None
 
+    def remove_socket(self, sock):
+        # TODO
+        self.proc.remove_task(sock)
+
+
     def shutdown(self):
         logging.info("Shutting down all active monitors")
         if not self.proc == None:
@@ -119,6 +150,9 @@ class Dimon():
         if not self.host == None:
             self._shutdown_monitor(self.host)
             self.host = None
+        if not self.sock == None:
+            self._shutdown_monitor(self.sock)
+            self.sock = None
 
     def spin_once(self):
         # results are dicts, keys are tasks

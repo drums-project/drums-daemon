@@ -139,7 +139,6 @@ class HostTaskTest(unittest.TestCase):
 
 from dimon._sock import SocketMonitor
 import subprocess
-import shlex
 
 class SocketTaskTest(unittest.TestCase):
     def setUp(self):
@@ -190,11 +189,11 @@ class SocketTaskTest(unittest.TestCase):
             time.sleep(0.5)
             d = q.get()
             pprint(d)
-            byte_count = d['tcp'][3333]
+            byte_count = d['sock']['tcp'][3333]
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
-            byte_count = d['udp'][4444]
+            byte_count = d['sock']['udp'][4444]
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
@@ -228,10 +227,23 @@ class DimonTest(unittest.TestCase):
         self.flag = 0
         self.flag_another = 0
         self.flag_host = 0
+        self.flag_sock = 0
         self.pid = os.getpid()
         self.d = None
+
         p = subprocess.Popen(["sleep", "10"])
         self.pid_another = p.pid
+
+        self.p_list = list()
+
+        cmds = list()
+        cmds.append("netcat -l -p 3333 > /dev/null")
+        cmds.append("netcat localhost 3333 < /dev/urandom")
+
+        for c in cmds:
+            self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
+            time.sleep(0.1)
+
 
     def test_dimon_pids_callback(self):
         def callback(pid, data):
@@ -252,10 +264,17 @@ class DimonTest(unittest.TestCase):
             self.flag_host += 1
             self.assertGreater(data['swap_memory']['free'], 0)
 
-        self.d = Dimon(process_interval = 0.1, host_interval = 0.5)
+        def callback_sock(sock, data):
+            self.flag_sock += 1
+            self.assertGreater(data['tcp'][3333], 0)
+
+        self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2)
         self.d.monitor_pid(self.pid, callback)
         self.d.monitor_pid(self.pid_another, callback_another)
         self.d.monitor_host(callback_host)
+        self.d.create_monitor_socket(callback_sock)
+        self.d.add_socket_to_monitor(('tcp', 'dst', 3333))
+
         for i in range(20):
             self.d.spin_once()
 
@@ -264,10 +283,15 @@ class DimonTest(unittest.TestCase):
         self.assertGreater(self.flag_another, 0)
         self.assertGreater(self.flag_host, 0)
         self.assertGreater(self.flag, self.flag_host, "Host monitor should have been called less than process monitor")
+        self.assertGreater(self.flag_sock, 0)
+        self.assertGreater(self.flag_sock, self.flag_host, "Host monitor should have been called less than socket monitor")
 
+        time.sleep(0.1)
     def tearDown(self):
         self.d.shutdown()
         os.kill(self.pid_another, signal.SIGKILL)
+        for p in self.p_list:
+            os.killpg(p.pid, signal.SIGTERM)
 
 def get_suite():
     test_suite = unittest.TestSuite()
