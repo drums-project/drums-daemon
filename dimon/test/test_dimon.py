@@ -220,6 +220,47 @@ class SocketTaskTest(unittest.TestCase):
         for p in self.p_list:
             os.killpg(p.pid, signal.SIGTERM)
 
+from dimon._latency import LatencyMonitor
+class LatencyTaskTest(unittest.TestCase):
+    def test_latency_basic(self):
+        q = Queue()
+        task = LatencyMonitor(q, 1, 5, 0.1)
+        task.register_task("127.0.0.1")
+        task.start()
+        time.sleep(0.1)
+        try:
+            try:
+                d = q.get(block = True, timeout = 1)
+            except Empty:
+                self.fail("Socket monitor did not report anything in 1 seconds")
+            data = d['latency']['127.0.0.1']
+            self.assertEqual(data['error'], None)
+            self.assertGreater(data['avg'], 0)
+            self.assertGreater(data['min'], 0)
+            self.assertGreaterEqual(data['max'], data['min'])
+        finally:
+            while task.is_alive():
+                task.terminate()
+                time.sleep(0.1)
+            task.join()
+
+    def test_latency_error(self):
+        q = Queue()
+        task = LatencyMonitor(q, 1, 5, 0.1)
+        task.register_task("http://ksajhdfkjhsadkjfhkdsahfhsdkhfjksdkf.jaskdhfjka")
+        task.start()
+        time.sleep(0.1)
+        try:
+            try:
+                d = q.get(block = True, timeout = 1)
+            except Empty:
+                self.fail("Socket monitor did not report anything in 1 seconds")
+            pprint(d)
+        finally:
+            while task.is_alive():
+                task.terminate()
+                time.sleep(0.1)
+            task.join()
 
 from dimon import Dimon
 class DimonTest(unittest.TestCase):
@@ -245,7 +286,7 @@ class DimonTest(unittest.TestCase):
             time.sleep(0.1)
 
 
-    def test_dimon_pids_callback(self):
+    def test_dimon_callback(self):
         def callback(pid, data):
             self.flag += 1
             self.assertEqual(pid, self.pid)
@@ -299,6 +340,7 @@ def get_suite():
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
     test_suite.addTest(unittest.makeSuite(HostTaskTest))
     test_suite.addTest(unittest.makeSuite(SocketTaskTest))
+    test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
     test_suite.addTest(unittest.makeSuite(DimonTest))
     return test_suite
 

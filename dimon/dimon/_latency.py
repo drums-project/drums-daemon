@@ -5,8 +5,9 @@ Latency monitoring daemon
 """
 
 from _common import *
+from _ping import *
 
-import ping
+import socket
 from pprint import pprint
 
 """
@@ -18,7 +19,6 @@ thread/process/coroutine though.
 class LatencyMonitor(TaskBase):
     def __init__(self, result_queue, default_interval, pings_per_interval, wait_between_pings = 0.1, name = ""):
         TaskBase.__init__(self, result_queue, default_interval, name)
-        self.inet = inet
         self.pings_per_interval = pings_per_interval
         self.target = None
         self.wait_between_pings = wait_between_pings
@@ -39,7 +39,8 @@ class LatencyMonitor(TaskBase):
             return
 
         # from `quiet_ping`
-        mrtt = None
+        mxrtt = None
+        mnrtt = None
         artt = None
         err = None # This holds only last error
         plist = []
@@ -50,7 +51,7 @@ class LatencyMonitor(TaskBase):
             try:
                 delay = do_one(self.target, timeout = 2, psize = 64)
                 success += 1
-            except socket.gaierror, e:
+            except socket.error as e:
                 err = e[1]
                 continue
 
@@ -67,10 +68,13 @@ class LatencyMonitor(TaskBase):
 
         dummy = dict()
         dummy['sent'] = sent
-        dummy['loss'] = sent - count
+        dummy['loss'] = sent - success
         dummy['avg'] = artt
         dummy['max'] = mxrtt
         dummy['min'] = mnrtt
+        dummy['error'] = err
+
+        data = dict()
         data['latency'] = dict()
         data['latency'][self.target] = dummy
 
