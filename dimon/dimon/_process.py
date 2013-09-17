@@ -15,6 +15,7 @@ class ProcessMonitor(TaskBase):
         for p in list(set(pids)):
             self.register_task(p)
 
+    # TODO: This is not thread safe
     def set_fields(self, fields):
         if fields:
             self.fields = list(set(fields))

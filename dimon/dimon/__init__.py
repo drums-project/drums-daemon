@@ -14,7 +14,7 @@ from _sock import SocketMonitor
 from pprint import pprint
 class Dimon():
     def __init__(self, process_interval = 1, host_interval = 1,
-        socket_interval = 1, process_fields = [], host_fields = []):
+        socket_interval = 1, late_interval = 1, late_pings_per_interval = 4, late_wait_between_pings = 0.1, process_fields = [], host_fields = []):
         self.q = Queue()
         self.process_interval = process_interval
         self.host_interval = host_interval
@@ -22,6 +22,9 @@ class Dimon():
         self.process_fields = process_fields
         self.host_fields = host_fields
         self.socket_inet = "any"
+        self.late_interval =late_interval
+        self.late_pings_per_interval = late_pings_per_interval
+        self.late_wait_between_pings = late_wait_between_pings
 
         self.running = False
 
@@ -29,6 +32,7 @@ class Dimon():
         self.proc = None
         self.host = None
         self.sock = None
+        self.late = dict()
 
         self.callback_map = dict()
 
@@ -63,6 +67,17 @@ class Dimon():
              self.socket_inet, "dimon_socketmonitor")
             self.sock.start()
 
+    def _create_new_latency_monitor(self):
+        # TODO: Customize name
+        if target not in self.late:
+            logging.debug("Creating a new LatencyMonitor object for %s" % (target,))
+            mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'dimon_latency_monitor')
+            self.late['target'] = mon
+            return True
+        else:
+            logging.warning("Unable to create a new monitor. A Latency monitor already exists for %s" % (target,))
+            return False
+
     def set_process_interval(self, interval):
         self.process_interval = interval
         if not self.proc == None:
@@ -78,6 +93,11 @@ class Dimon():
         if not self.host == None:
             self.host.set_interval(self.host_interval)
 
+    def set_late_interval(self, interval):
+        self.late_interval = interval
+        for target, late in self.late:
+            self.late.set_interval(self.late_interval)
+
     def set_host_fields(self, fields):
         self.host_fields = fields
         if not self.host == None:
@@ -87,6 +107,12 @@ class Dimon():
         self.socket_interval = interval
         if not self.sock == None:
             self.sock.set_interval(self.sock_interval)
+
+    def set_latency_options(self, pings_per_interval, wait_between_pings):
+        self.pings_per_interval = pings_per_interval
+        self.wait_between_pings = wait_between_pings
+        for target, late in self.late:
+            late.set_options(pings_per_interval, wait_between_pings)
 
     def monitor_pid(self, pid, callback):
         self._create_proc_monitor()
@@ -112,6 +138,12 @@ class Dimon():
             raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
         self.sock.register_task(sock)
 
+    def monitor_target_latency(self, target, callback):
+        if self._create_new_latency_monitor():
+            self.late[target].register_task(target)
+            self.late[target].start()
+            self.callback_map[target] = callback
+
     def remove_host(self):
         self.host.remove_task('host')
         try:
@@ -126,7 +158,7 @@ class Dimon():
         self.proc.remove_task(pid)
         try:
             del self.callback_map[pid]
-        except:
+        except KeyError:
             logging.error("pid not in internal monitoring map. This should never happen")
         finally:
             pass
@@ -141,6 +173,17 @@ class Dimon():
         # TODO
         self.proc.remove_task(sock)
 
+    def remove_target_latency(self, target):
+        if target in self.late:
+            self.late[target].remove_task(target)
+            self.late[target].stop()
+            try:
+                del self.callback_map[target]
+                del self.late[target]
+            except KeyError:
+                logging.error("KeyError while deleting latency task. This should never happen")
+        else:
+            logging.error("Latency Monitor task (%s) not found." % (target,))
 
     def shutdown(self):
         logging.info("Shutting down all active monitors")
@@ -153,6 +196,9 @@ class Dimon():
         if not self.sock == None:
             self._shutdown_monitor(self.sock)
             self.sock = None
+        for target, late in self.late:
+            self._shutdown_monitor(self.late[target])
+            del self.late[target]
 
     def spin_once(self):
         # results are dicts, keys are tasks

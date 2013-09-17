@@ -23,6 +23,11 @@ class LatencyMonitor(TaskBase):
         self.target = None
         self.wait_between_pings = wait_between_pings
 
+    # TODO: This is not thread safe
+    def set_options(self, pings_per_interval, wait_between_pings):
+        self.pings_per_interval = pings_per_interval
+        self.wait_between_pings = wait_between_pings
+
     def register_task_core(self, task):
         self.target = task
 

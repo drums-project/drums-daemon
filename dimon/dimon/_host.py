@@ -15,6 +15,7 @@ class HostMonitor(TaskBase):
         for p in list(set(pids)):
             self.register_task(p)
 
+    # TODO: This is not thread safe
     def set_fields(self, fields):
         if len(fields) > 0:
             self.fields = list(set(fields))
