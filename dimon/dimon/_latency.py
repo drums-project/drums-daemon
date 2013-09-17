@@ -75,8 +75,7 @@ class LatencyMonitor(TaskBase):
         dummy['error'] = err
 
         data = dict()
-        data['latency'] = dict()
-        data['latency'][self.target] = dummy
+        data[self.target] = dummy
 
         if data:
             try:

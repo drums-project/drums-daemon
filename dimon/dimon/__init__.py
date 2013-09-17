@@ -10,6 +10,7 @@ from _common import *
 from _process import ProcessMonitor
 from _host import HostMonitor
 from _sock import SocketMonitor
+from _latency import LatencyMonitor
 
 from pprint import pprint
 class Dimon():
@@ -67,12 +68,12 @@ class Dimon():
              self.socket_inet, "dimon_socketmonitor")
             self.sock.start()
 
-    def _create_new_latency_monitor(self):
+    def _create_new_latency_monitor(self, target):
         # TODO: Customize name
         if target not in self.late:
             logging.debug("Creating a new LatencyMonitor object for %s" % (target,))
             mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'dimon_latency_monitor')
-            self.late['target'] = mon
+            self.late[target] = mon
             return True
         else:
             logging.warning("Unable to create a new monitor. A Latency monitor already exists for %s" % (target,))
@@ -95,7 +96,7 @@ class Dimon():
 
     def set_late_interval(self, interval):
         self.late_interval = interval
-        for target, late in self.late:
+        for target, late in self.late.items():
             self.late.set_interval(self.late_interval)
 
     def set_host_fields(self, fields):
@@ -111,7 +112,7 @@ class Dimon():
     def set_latency_options(self, pings_per_interval, wait_between_pings):
         self.pings_per_interval = pings_per_interval
         self.wait_between_pings = wait_between_pings
-        for target, late in self.late:
+        for target, late in self.late.items():
             late.set_options(pings_per_interval, wait_between_pings)
 
     def monitor_pid(self, pid, callback):
@@ -139,7 +140,7 @@ class Dimon():
         self.sock.register_task(sock)
 
     def monitor_target_latency(self, target, callback):
-        if self._create_new_latency_monitor():
+        if self._create_new_latency_monitor(target):
             self.late[target].register_task(target)
             self.late[target].start()
             self.callback_map[target] = callback
@@ -196,7 +197,7 @@ class Dimon():
         if not self.sock == None:
             self._shutdown_monitor(self.sock)
             self.sock = None
-        for target, late in self.late:
+        for target, late in self.late.items():
             self._shutdown_monitor(self.late[target])
             del self.late[target]
 

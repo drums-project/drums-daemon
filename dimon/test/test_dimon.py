@@ -233,7 +233,7 @@ class LatencyTaskTest(unittest.TestCase):
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Socket monitor did not report anything in 1 seconds")
-            data = d['latency']['127.0.0.1']
+            data = d['127.0.0.1']
             self.assertEqual(data['error'], None)
             self.assertGreater(data['avg'], 0)
             self.assertGreater(data['min'], 0)
@@ -247,7 +247,8 @@ class LatencyTaskTest(unittest.TestCase):
     def test_latency_error(self):
         q = Queue()
         task = LatencyMonitor(q, 1, 5, 0.1)
-        task.register_task("http://ksajhdfkjhsadkjfhkdsahfhsdkhfjksdkf.jaskdhfjka")
+        invalid_domain = "ksajhdfkjhsadkjfhkdsahfhsdkhfjksdkf.ttt"
+        task.register_task(invalid_domain)
         task.start()
         time.sleep(0.1)
         try:
@@ -255,7 +256,7 @@ class LatencyTaskTest(unittest.TestCase):
                 d = q.get(block = True, timeout = 1)
             except Empty:
                 self.fail("Socket monitor did not report anything in 1 seconds")
-            pprint(d)
+            self.assertNotEqual(d[invalid_domain]['error'], None)
         finally:
             while task.is_alive():
                 task.terminate()
@@ -269,6 +270,7 @@ class DimonTest(unittest.TestCase):
         self.flag_another = 0
         self.flag_host = 0
         self.flag_sock = 0
+        self.flag_late = 0
         self.pid = os.getpid()
         self.d = None
 
@@ -309,20 +311,26 @@ class DimonTest(unittest.TestCase):
             self.flag_sock += 1
             self.assertGreater(data['tcp'][3333], 0)
 
-        self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2)
+        def callback_late(target, data):
+            self.flag_late += 1
+            self.assertNotEqual(data['error'], data['avg'])
+
+        self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2, late_interval = 1, late_pings_per_interval = 5, late_wait_between_pings = 0.05)
         self.d.monitor_pid(self.pid, callback)
         self.d.monitor_pid(self.pid_another, callback_another)
         self.d.monitor_host(callback_host)
         self.d.create_monitor_socket(callback_sock)
         self.d.add_socket_to_monitor(('tcp', 'dst', 3333))
-
-        for i in range(20):
+        self.d.monitor_target_latency('127.0.0.1', callback_late)
+        self.d.monitor_target_latency('google.co.jp', callback_late)
+        for i in range(30):
             self.d.spin_once()
 
         #print self.flag, self.flag_another, self.flag_host
         self.assertGreater(self.flag, 0)
         self.assertGreater(self.flag_another, 0)
         self.assertGreater(self.flag_host, 0)
+        self.assertGreater(self.flag_late, 0)
         self.assertGreater(self.flag, self.flag_host, "Host monitor should have been called less than process monitor")
         self.assertGreater(self.flag_sock, 0)
         self.assertGreater(self.flag_sock, self.flag_host, "Host monitor should have been called less than socket monitor")
