@@ -33,5 +33,6 @@ setup(
     license = 'LICENSE',
     install_requires = ['bottle', 'dimon'],
     description = 'TODO',
+    scripts = ["dimond.py"],
     test_suite = 'test.test_dimond.get_suite'
 )
