@@ -175,7 +175,7 @@ class Dimon():
 
     def remove_pid(self, pid):
         res = self.proc.remove_task(pid)
-        if res == success:
+        if res == DimonError.SUCCESS:
             try:
                 del self.callback_map[pid]
             except KeyError:

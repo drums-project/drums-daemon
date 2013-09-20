@@ -24,14 +24,14 @@ class BasicTask(TaskBase):
 
     def register_task_core(self, task):
         self.task_map[task] = 0
-        return ERR_SUCCESS
+        return DimonError.SUCCESS
 
     def remove_task_core(self, task):
         try:
             del self.task_map[task]
-            return ERR_SUCCESS
+            return DimonError.SUCCESS
         except KeyError:
-            return ERR_NOTFOUND
+            return DimonError.NOTFOUND
 
     def do(self):
         sys.stdout.write('>')

@@ -70,10 +70,10 @@ class ProcessMonitor(TaskBase):
                 # TODO: Fix the following circular loople
                 except psutil.NoSuchProcess:
                     logging.warning("NoSuchProcess for %s, removing it", pid)
-                    #self.remove_task(pid)
+                    del self.task_map[pid]
                 except psutil.AccessDenied:
                     logging.warning("AccessDenied for %s, removing it", pid)
-                    #self.remove_task(pid)
+                    del self.task_map[pid]
 
                 # This is all about the s**t about pickle is not able
                 # to encode/decode a nested class (used by psutils)
