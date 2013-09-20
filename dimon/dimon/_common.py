@@ -24,6 +24,13 @@ import sys
 import logging
 import time
 
+ERR_SUCCESS  = 0
+ERR_NOTFOUND = 1
+ERR_ACCESSDENIED = 2
+ERR_TIMEOUT = 3
+ERR_RUNTIME = 4
+ERR_UNEXPECTED = 5
+
 # TODO: Refactor to Python < 2.7
 # TODO: Write test
 def namedtuple_to_dict(nt):
@@ -69,8 +76,7 @@ class TaskCommon():
         while not self.result_queue.empty():
             self.result_queue.get()
 
-
-    def terminate(self):
+    def set_terminate_event(self):
         self._terminate_event.set()
 
     def register_task(self, task):
@@ -103,11 +109,11 @@ if concurrency_impl in ['gevent', 'threading']:
 
         def register_task(self, task):
             with self.task_map_lock:
-                self.register_task_core(task)
+                return self.register_task_core(task)
 
         def remove_task(self, task):
             with self.task_map_lock:
-                self.remove_task_core(task)
+                return self.remove_task_core(task)
 
         def run(self):
             """
@@ -135,19 +141,30 @@ elif concurrency_impl == 'multiprocessing':
             TaskCommon.__init__(self, result_queue, default_interval)
             Process.__init__(self, target = None, name = name)
             # TODO: Should all tasks be daemons?
-            self.daemon = True
+            #self.daemon = True
             self.cmd_queue = Queue()
+            self.feedback_queue = Queue()
 
         def register_task(self, task):
             try:
                 self.cmd_queue.put(('a', task))
-            except Queue.Full:
+                # Wait 5 seconds for the feeback
+                try:
+                    return self.feedback_queue.get(block = True, timeout = 5)
+                except Empty:
+                    return ERR_TIMEOUT
+            except Full:
                 logging.error("Queue is full %s", self)
 
         def remove_task(self, task):
             try:
                 self.cmd_queue.put(('r', task))
-            except Queue.Full:
+                try:
+                    # Wait 5 seconds for the feeback
+                    return self.feedback_queue.get(block = True, timeout = 5)
+                except Empty:
+                    return ERR_TIMEOUT
+            except Full:
                 logging.error("Queue is full %s", self)
 
         def run(self):
@@ -160,10 +177,11 @@ elif concurrency_impl == 'multiprocessing':
                     # Process command queue
                     while not self.cmd_queue.empty():
                         cmd, task = self.cmd_queue.get()
+                        # Send feedback using feedback_queue
                         if cmd == 'a':
-                            self.register_task_core(task)
+                            self.feedback_queue.put(self.register_task_core(task))
                         elif cmd == 'r':
-                            self.remove_task_core(task)
+                            self.feedback_queue.put(self.remove_task_core(task))
                         else:
                             raise ValueError("cmd %s not recognized in %s" % (cmd, self))
                     self.do()
@@ -174,6 +192,12 @@ elif concurrency_impl == 'multiprocessing':
                     except:
                         logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                     self._last_loop_time = time.time()
+
+
+                while not self.feedback_queue.empty():
+                    self.feedback_queue.get()
                 logging.debug("Task %s terminated.", self)
             except:
                 print "Task(%s) exited with '%s'" % (self.name, sys.exc_info())
+
+            return True

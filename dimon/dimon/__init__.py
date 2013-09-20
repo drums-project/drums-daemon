@@ -43,10 +43,16 @@ class Dimon():
             self.q.get()
 
     def _shutdown_monitor(self, mon):
-        while mon.is_alive():
-            mon.terminate()
-            time.sleep(0.1)
+        logging.info("Trying to kill `%s`" % (mon, ))
+        mon.set_terminate_event()
+        logging.info("Waiting for process `%s` to finish." % (mon, ))
         mon.join()
+        #while mon.is_alive():
+        #    logging.info("> killing `%s`" % (mon, ))
+        #    mon.set_terminate_event()
+        #    time.sleep(0.1)
+        #logging.info("Killed `%s`" % (mon, ))
+        #mon.join()
 
     def _create_proc_monitor(self):
         if self.proc == None:
@@ -117,19 +123,24 @@ class Dimon():
 
     def monitor_pid(self, pid, callback):
         self._create_proc_monitor()
-        self.proc.register_task(pid)
-        self.callback_map[pid] = callback
+        res = self.proc.register_task(pid)
+        if res == ERR_SUCCESS:
+            self.callback_map[pid] = callback
+        return res
 
     def monitor_host(self, callback):
         self._create_host_monitor()
         # TODO: Change 'host' to variable key
-        self.host.register_task('host')
-        self.callback_map['host'] = callback
+        res = self.host.register_task('host')
+        if res == ERR_SUCCESS:
+            self.callback_map['host'] = callback
+        return res
 
     def create_monitor_socket(self, callback, inet = "any"):
         self.socket_inet = inet
         self._create_socket_monitor()
         self.callback_map['sock'] = callback
+        return ERR_SUCCESS
 
     def add_socket_to_monitor(self, sock):
         """
@@ -137,42 +148,52 @@ class Dimon():
         """
         if self.sock == None:
             raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
-        self.sock.register_task(sock)
+            return ERR_RUNTIME
+
+        return self.sock.register_task(sock)
 
     def monitor_target_latency(self, target, callback):
         if self._create_new_latency_monitor(target):
-            self.late[target].register_task(target)
             self.late[target].start()
-            self.callback_map[target] = callback
+            res = self.late[target].register_task(target)
+            if (res == ERR_SUCCESS):
+                self.callback_map[target] = callback
+            return res
 
     def remove_host(self):
-        self.host.remove_task('host')
-        try:
-            del self.callback_map['host']
-        except:
-            logging.error("host not in internal monitoring map. This should never happen")
-        finally:
-            self._shutdown_monitor(self.host)
-            self.host = None
+        res = self.host.remove_task('host')
+        if res == ERR_SUCCESS:
+            try:
+                del self.callback_map['host']
+            except:
+                logging.error("host not in internal monitoring map. This should never happen")
+                return ERR_UNEXPECTED
+            finally:
+                self._shutdown_monitor(self.host)
+                self.host = None
+        return res
 
     def remove_pid(self, pid):
-        self.proc.remove_task(pid)
-        try:
-            del self.callback_map[pid]
-        except KeyError:
-            logging.error("pid not in internal monitoring map. This should never happen")
-        finally:
-            pass
-            # TODO: Find a way to shutdown processmonitor when pid
-            # list is empty
-            #if len(self.callback_map.keys()) == 0:
-                # There is no ProcessMonitor, lets shut it down
-            #    self._shutdown_monitor(self.proc)
-            #    self.proc = None
+        res = self.proc.remove_task(pid)
+        if res == success:
+            try:
+                del self.callback_map[pid]
+            except KeyError:
+                logging.error("pid not in internal monitoring map. This should never happen")
+                return ERR_UNEXPECTED
+            finally:
+                pass
+                # TODO: Find a way to shutdown processmonitor when pid
+                # list is empty
+                #if len(self.callback_map.keys()) == 0:
+                    # There is no ProcessMonitor, lets shut it down
+                #    self._shutdown_monitor(self.proc)
+                #    self.proc = None
+        return res
 
     def remove_socket(self, sock):
         # TODO
-        self.proc.remove_task(sock)
+        return self.proc.remove_task(sock)
 
     def remove_target_latency(self, target):
         if target in self.late:
@@ -183,8 +204,10 @@ class Dimon():
                 del self.late[target]
             except KeyError:
                 logging.error("KeyError while deleting latency task. This should never happen")
+                return ERR_UNEXPECTED
         else:
             logging.error("Latency Monitor task (%s) not found." % (target,))
+            return ERR_NOTFOUND
 
     def shutdown(self):
         logging.info("Shutting down all active monitors")

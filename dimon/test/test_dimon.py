@@ -13,6 +13,7 @@ import random
 import os
 import sys
 import signal
+import logging
 
 from dimon._common import *
 from pprint import pprint
@@ -23,9 +24,14 @@ class BasicTask(TaskBase):
 
     def register_task_core(self, task):
         self.task_map[task] = 0
+        return ERR_SUCCESS
 
     def remove_task_core(self, task):
-        del self.task_map[task]
+        try:
+            del self.task_map[task]
+            return ERR_SUCCESS
+        except KeyError:
+            return ERR_NOTFOUND
 
     def do(self):
         sys.stdout.write('>')
@@ -39,8 +45,8 @@ class TaskBaseTest(unittest.TestCase):
     def test_basic_task_loop(self):
         q = Queue()
         task = BasicTask(q, 0.1)
-        task.register_task('t1')
         task.start()
+        task.register_task('t1')
         try:
             time.sleep(0.1)
             d = q.get(); task.flush_result_queue()
@@ -55,12 +61,11 @@ class TaskBaseTest(unittest.TestCase):
             self.assertGreater(d['t2'], 0)
             task.remove_task('t2')
             time.sleep(0.1)
+            task.flush_result_queue()
             d = q.get()
             self.assertEqual(len(d), 1)
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
 from dimon._process import ProcessMonitor
@@ -69,9 +74,10 @@ class ProcessTaskTest(unittest.TestCase):
     def test_process_creation(self):
         q = Queue()
         task = ProcessMonitor(q, 0.1)
+        task.start()
+
         pid = os.getpid()
         task.register_task(pid)
-        task.start()
         time.sleep(0.1)
         try:
             try:
@@ -96,9 +102,7 @@ class ProcessTaskTest(unittest.TestCase):
                 pass
 
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
 from dimon._host import HostMonitor
@@ -107,8 +111,8 @@ class HostTaskTest(unittest.TestCase):
     def test_host_creation(self):
         q = Queue()
         task = HostMonitor(q, 0.1)
-        task.register_task(None)
         task.start()
+        task.register_task(None)
         time.sleep(0.1)
         try:
             try:
@@ -132,9 +136,7 @@ class HostTaskTest(unittest.TestCase):
                 pass
 
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
 from dimon._sock import SocketMonitor
@@ -172,11 +174,12 @@ class SocketTaskTest(unittest.TestCase):
     def test_socket_basic(self):
         q = Queue()
         task = SocketMonitor(q, 0.5, "lo")
+        task.start()
+
         t1 = ("tcp", "dst", "3333")
         t2 = ("udp", "dst", "4444")
         task.register_task(t2)
         task.register_task(t1)
-        task.start()
         # Wait some time until all packets get captured,
         # threaded mode needs more time
         #task.flush_result_queue()
@@ -210,9 +213,7 @@ class SocketTaskTest(unittest.TestCase):
                 pass
 
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
     def tearDown(self):
@@ -225,42 +226,40 @@ class LatencyTaskTest(unittest.TestCase):
     def test_latency_basic(self):
         q = Queue()
         task = LatencyMonitor(q, 1, 5, 0.1)
-        task.register_task("127.0.0.1")
         task.start()
+
+        task.register_task("127.0.0.1")
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 1)
+                d = q.get(block = True, timeout = 5)
             except Empty:
-                self.fail("Socket monitor did not report anything in 1 seconds")
+                self.fail("Socket monitor did not report anything in 5 seconds")
             data = d['127.0.0.1']
             self.assertEqual(data['error'], None)
             self.assertGreater(data['avg'], 0)
             self.assertGreater(data['min'], 0)
             self.assertGreaterEqual(data['max'], data['min'])
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
     def test_latency_error(self):
         q = Queue()
         task = LatencyMonitor(q, 1, 5, 0.1)
+        task.start()
+
         invalid_domain = "ksajhdfkjhsadkjfhkdsahfhsdkhfjksdkf.ttt"
         task.register_task(invalid_domain)
-        task.start()
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 1)
+                d = q.get(block = True, timeout = 5)
             except Empty:
-                self.fail("Socket monitor did not report anything in 1 seconds")
+                self.fail("Socket monitor did not report anything in 5 seconds")
             self.assertNotEqual(d[invalid_domain]['error'], None)
         finally:
-            while task.is_alive():
-                task.terminate()
-                time.sleep(0.1)
+            task.set_terminate_event()
             task.join()
 
 from dimon import Dimon
@@ -286,6 +285,8 @@ class DimonTest(unittest.TestCase):
         for c in cmds:
             self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
             time.sleep(0.1)
+
+        self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2, late_interval = 1, late_pings_per_interval = 5, late_wait_between_pings = 0.05)
 
 
     def test_dimon_callback(self):
@@ -315,24 +316,24 @@ class DimonTest(unittest.TestCase):
             self.flag_late += 1
             self.assertNotEqual(data['error'], data['avg'])
 
-        self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2, late_interval = 1, late_pings_per_interval = 5, late_wait_between_pings = 0.05)
+
         self.d.monitor_pid(self.pid, callback)
         self.d.monitor_pid(self.pid_another, callback_another)
         self.d.monitor_host(callback_host)
         self.d.create_monitor_socket(callback_sock)
         self.d.add_socket_to_monitor(('tcp', 'dst', 3333))
-        self.d.monitor_target_latency('127.0.0.1', callback_late)
+        self.d.monitor_target_latency('localhost', callback_late)
         self.d.monitor_target_latency('google.co.jp', callback_late)
-        for i in range(30):
+        for i in range(20):
             self.d.spin_once()
 
         #print self.flag, self.flag_another, self.flag_host
         self.assertGreater(self.flag, 0)
         self.assertGreater(self.flag_another, 0)
         self.assertGreater(self.flag_host, 0)
+        self.assertGreater(self.flag_sock, 0)
         self.assertGreater(self.flag_late, 0)
         self.assertGreater(self.flag, self.flag_host, "Host monitor should have been called less than process monitor")
-        self.assertGreater(self.flag_sock, 0)
         self.assertGreater(self.flag_sock, self.flag_host, "Host monitor should have been called less than socket monitor")
 
         time.sleep(0.1)
@@ -343,6 +344,7 @@ class DimonTest(unittest.TestCase):
             os.killpg(p.pid, signal.SIGTERM)
 
 def get_suite():
+    logging.basicConfig(filename='test.log', level=logging.DEBUG, format='%(asctime)s %(message)s')
     test_suite = unittest.TestSuite()
     test_suite.addTest(unittest.makeSuite(TaskBaseTest))
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))

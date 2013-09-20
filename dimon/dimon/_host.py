@@ -26,12 +26,13 @@ class HostMonitor(TaskBase):
             'disk_io_counters', 'net_io_counters']
 
             # I hate these version compatibility hack!
-            # Even on Ubuntu 13.04, python-psutil point to 0.6
+            # Even on Ubuntu 13.04, python-psutil points to 0.6
             # while latest version is 1.1 !
 
             # TODO change fields to dict {attr: psutil function}
             self.net_hack = psutil.version_info < (1, 1, 0)
             if self.net_hack:
+                self.fields.remove('net_io_counters')
                 self.fields.append('network_io_counters')
 
 
@@ -41,13 +42,16 @@ class HostMonitor(TaskBase):
         """
         logging.debug("Registering host")
         self.task_map['host'] = psutil
+        return ERR_SUCCESS
 
 
     def remove_task_core(self, task):
         try:
             del self.task_map['host']
+            return ERR_SUCCESS
         except KeyError:
-            logging.warning("Error removing host")
+            logging.error("Error removing host")
+            return ERR_NOTFOUND
 
     def do(self):
         data = dict()
@@ -80,8 +84,8 @@ class HostMonitor(TaskBase):
             elif attr != None:
                 dummy = str(attr)
             else:
-                logging.debug("[in %s] Attribute `%s` not found."
-                    % (self, f))
+                #logging.debug("[in %s] Attribute `%s` not found."
+                #    % (self, f))
                 continue
 
             # This is all about the s**t about pickle is not able

@@ -30,9 +30,11 @@ class LatencyMonitor(TaskBase):
 
     def register_task_core(self, task):
         self.target = task
+        return ERR_SUCCESS
 
     def remove_task_core(self, task):
         self.target = None
+        return ERR_SUCCESS
 
     def do(self):
         if not self.target:

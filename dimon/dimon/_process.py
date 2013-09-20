@@ -30,19 +30,24 @@ class ProcessMonitor(TaskBase):
         try:
             logging.debug("Registering pid: %s" % (task,))
             self.task_map[task] = psutil.Process(task)
+            return ERR_SUCCESS
         except psutil.NoSuchProcess:
             logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
                 % (self, task))
+            return ERR_NOTFOUND
         except psutil.AccessDenied:
             logging.error("[in %s] Error adding PID (AccessDenied) `%s`"
                 % (self, task))
+            return ERR_ACCESSDENIED
 
     def remove_task_core(self, task):
         try:
             del self.task_map[task]
+            return ERR_SUCCESS
         except KeyError:
-            logging.warning("[in %s] Error removing PID `%s`"
+            logging.error("[in %s] Error removing PID `%s`"
                 % (self, task))
+            return ERR_NOTFOUND
 
     def do(self):
         data = dict()
@@ -62,12 +67,13 @@ class ProcessMonitor(TaskBase):
                         logging.warning("[in %s] Attribute `%s` not found."
                             % (self, f))
                         continue
+                # TODO: Fix the following circular loop
                 except psutil.NoSuchProcess:
                     logging.warning("NoSuchProcess for %s, removing it", pid)
-                    self.remove_task(pid)
+                    #self.remove_task(pid)
                 except psutil.AccessDenied:
                     logging.warning("AccessDenied for %s, removing it", pid)
-                    self.remove_task(pid)
+                    #self.remove_task(pid)
 
                 # This is all about the s**t about pickle is not able
                 # to encode/decode a nested class (used by psutils)
@@ -82,4 +88,5 @@ class ProcessMonitor(TaskBase):
                     % (self, ))
             finally:
                 pass#pprint(data)
+
 
