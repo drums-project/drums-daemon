@@ -42,16 +42,16 @@ class HostMonitor(TaskBase):
         """
         logging.debug("Registering host")
         self.task_map['host'] = psutil
-        return ERR_SUCCESS
+        return DimonError.SUCCESS
 
 
     def remove_task_core(self, task):
         try:
             del self.task_map['host']
-            return ERR_SUCCESS
+            return DimonErrorSUCCESS
         except KeyError:
             logging.error("Error removing host")
-            return ERR_NOTFOUND
+            return DimonErrorNOTFOUND
 
     def do(self):
         data = dict()

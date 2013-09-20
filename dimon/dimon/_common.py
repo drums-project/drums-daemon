@@ -24,12 +24,16 @@ import sys
 import logging
 import time
 
-ERR_SUCCESS  = 0
-ERR_NOTFOUND = 1
-ERR_ACCESSDENIED = 2
-ERR_TIMEOUT = 3
-ERR_RUNTIME = 4
-ERR_UNEXPECTED = 5
+class __dimon__error():
+    def __init__(self):
+        self.SUCCESS  = 0
+        self.NOTFOUND = 1
+        self.ACCESSDENIED = 2
+        self.TIMEOUT = 3
+        self.RUNTIME = 4
+        self.UNEXPECTED = 5
+
+DimonError = __dimon__error()
 
 # TODO: Refactor to Python < 2.7
 # TODO: Write test
@@ -152,7 +156,7 @@ elif concurrency_impl == 'multiprocessing':
                 try:
                     return self.feedback_queue.get(block = True, timeout = 5)
                 except Empty:
-                    return ERR_TIMEOUT
+                    return DimonError.TIMEOUT
             except Full:
                 logging.error("Queue is full %s", self)
 
@@ -163,7 +167,7 @@ elif concurrency_impl == 'multiprocessing':
                     # Wait 5 seconds for the feeback
                     return self.feedback_queue.get(block = True, timeout = 5)
                 except Empty:
-                    return ERR_TIMEOUT
+                    return DimonError.TIMEOUT
             except Full:
                 logging.error("Queue is full %s", self)
 

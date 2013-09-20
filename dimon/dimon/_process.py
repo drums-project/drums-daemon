@@ -30,24 +30,24 @@ class ProcessMonitor(TaskBase):
         try:
             logging.debug("Registering pid: %s" % (task,))
             self.task_map[task] = psutil.Process(task)
-            return ERR_SUCCESS
+            return DimonError.SUCCESS
         except psutil.NoSuchProcess:
             logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
                 % (self, task))
-            return ERR_NOTFOUND
+            return DimonError.NOTFOUND
         except psutil.AccessDenied:
             logging.error("[in %s] Error adding PID (AccessDenied) `%s`"
                 % (self, task))
-            return ERR_ACCESSDENIED
+            return DimonError.ACCESSDENIED
 
     def remove_task_core(self, task):
         try:
             del self.task_map[task]
-            return ERR_SUCCESS
+            return DimonError.SUCCESS
         except KeyError:
             logging.error("[in %s] Error removing PID `%s`"
                 % (self, task))
-            return ERR_NOTFOUND
+            return DimonError.NOTFOUND
 
     def do(self):
         data = dict()
@@ -67,7 +67,7 @@ class ProcessMonitor(TaskBase):
                         logging.warning("[in %s] Attribute `%s` not found."
                             % (self, f))
                         continue
-                # TODO: Fix the following circular loop
+                # TODO: Fix the following circular loople
                 except psutil.NoSuchProcess:
                     logging.warning("NoSuchProcess for %s, removing it", pid)
                     #self.remove_task(pid)

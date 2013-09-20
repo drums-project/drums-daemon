@@ -78,7 +78,7 @@ class SocketMonitor(TaskBase):
         self.task_map[filter_str] = True
         self.data[proto][port] = 0
         self.update_filters()
-        return ERR_SUCCESS
+        return DimonError.SUCCESS
 
     def remove_task_core(self, task):
         try:
@@ -86,10 +86,10 @@ class SocketMonitor(TaskBase):
             del self.task_map[filter_str]
             del self.data[proto][port]
             self.update_filters()
-            return ERR_SUCCESS
+            return DimonError.SUCCESS
         except KeyError:
             logging.error("Error removing socket filter: %s" % (task,))
-            return ERR_NOTFOUND
+            return DimonError.NOTFOUND
 
     def do(self):
         # TODO: Check if re-implementing the IMPacket would improve performance
