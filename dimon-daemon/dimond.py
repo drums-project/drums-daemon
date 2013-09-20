@@ -9,7 +9,14 @@ version_info = tuple([int(num) for num in __version__.split('.')])
 import logging
 import bottle
 from threading import Thread, current_thread
-from dimon import Dimon
+from dimon import Dimon, DimonError
+
+__err_map = {DimonError.SUCCESS: 200, DimonError.NOTFOUND: 404,
+        DimonError.ACCESSDENIED: 403, DimonError.RUNTIME: 406,
+        DimonError.UNEXPECTED: 500}
+
+def http_response(err):
+    bottle.abort(__err_map.get(err, 400))
 
 class DimonDaemon(object):
     def __init__(self, config = dict(), debug = None):
@@ -29,30 +36,23 @@ class DimonDaemon(object):
 
     def loop(self):
         while True:
-            print "loop"
+            print ">>> loop"
             try:
                 self.dimon.spin_once()
             except KeyboardInterrupt:
+                logging.info("Shutting down dimon ...")
+                self.dimon.shutdown()
                 return True
 
     def _callback_pid(self, pid, data):
         print "[%s] data for %s received" % (current_thread().ident, pid)
 
     def add_pid(self, pid):
-        try:
-            self.dimon.monitor_pid(pid, self._callback_pid)
-        except IndexError:
-            abort(404)
-        except OSError:
-            abort(401)
+        http_response(self.dimon.monitor_pid(pid, self._callback_pid))
+
 
     def remove_pid(self, pid):
-        try:
-            self.dimon.remove_pid(pid)
-        except IndexError:
-            abort(404)
-        except OSError:
-            abort(401)
+        http_response(self.dimon.remove_pid(pid))
 
 if __name__ == "__main__":
 
