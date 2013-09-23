@@ -12,6 +12,9 @@ from _host import HostMonitor
 from _sock import SocketMonitor
 from _latency import LatencyMonitor
 
+# To guarantee thread safety
+from threading import Lock
+
 from pprint import pprint
 class Dimon():
     def __init__(self, process_interval = 1, host_interval = 1,
@@ -36,6 +39,7 @@ class Dimon():
         self.late = dict()
 
         self.callback_map = dict()
+        self.lock = Lock()
 
     def flush_result_queue(self):
         #TODO: Check errors?
@@ -125,7 +129,8 @@ class Dimon():
         self._create_proc_monitor()
         res = self.proc.register_task(pid)
         if res == DimonError.SUCCESS:
-            self.callback_map[pid] = callback
+            with self.lock:
+                self.callback_map[pid] = callback
         return res
 
     def monitor_host(self, callback):
@@ -133,13 +138,15 @@ class Dimon():
         # TODO: Change 'host' to variable key
         res = self.host.register_task('host')
         if res == DimonError.SUCCESS:
-            self.callback_map['host'] = callback
+            with self.lock:
+                self.callback_map['host'] = callback
         return res
 
     def create_monitor_socket(self, callback, inet = "any"):
         self.socket_inet = inet
         self._create_socket_monitor()
-        self.callback_map['sock'] = callback
+        with self.lock:
+            self.callback_map['sock'] = callback
         return DimonError.SUCCESS
 
     def add_socket_to_monitor(self, sock):
@@ -157,14 +164,16 @@ class Dimon():
             self.late[target].start()
             res = self.late[target].register_task(target)
             if (res == DimonError.SUCCESS):
-                self.callback_map[target] = callback
+                with self.lock:
+                    self.callback_map[target] = callback
             return res
 
     def remove_host(self):
         res = self.host.remove_task('host')
         if res == DimonError.SUCCESS:
             try:
-                del self.callback_map['host']
+                with self.lock:
+                    del self.callback_map['host']
             except:
                 logging.error("host not in internal monitoring map. This should never happen")
                 return DimonError.UNEXPECTED
@@ -177,7 +186,8 @@ class Dimon():
         res = self.proc.remove_task(pid)
         if res == DimonError.SUCCESS:
             try:
-                del self.callback_map[pid]
+                with self.lock:
+                    del self.callback_map[pid]
             except KeyError:
                 logging.error("pid not in internal monitoring map. This should never happen")
                 return DimonError.UNEXPECTED
@@ -200,7 +210,8 @@ class Dimon():
             self.late[target].remove_task(target)
             self.late[target].stop()
             try:
-                del self.callback_map[target]
+                with self.lock:
+                    del self.callback_map[target]
                 del self.late[target]
             except KeyError:
                 logging.error("KeyError while deleting latency task. This should never happen")
@@ -229,7 +240,8 @@ class Dimon():
         data_pair_dict = self.q.get()
         for task, data in data_pair_dict.items():
             try:
-                self.callback_map[task](task, data)
+                with self.lock:
+                    self.callback_map[task](task, data)
             except KeyError:
                 logging.error("Error calling callback for task=%s"
                     % (task,))
