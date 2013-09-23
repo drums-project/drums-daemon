@@ -169,6 +169,10 @@ class Dimon():
             return res
 
     def remove_host(self):
+        if not self.host:
+            logging.error("Dimon HostMonitor has not been started yet.")
+            return DimonError.NOTFOUND
+
         res = self.host.remove_task('host')
         if res == DimonError.SUCCESS:
             try:
@@ -183,6 +187,10 @@ class Dimon():
         return res
 
     def remove_pid(self, pid):
+        if not self.proc:
+            logging.error("Dimon ProcessMonitor has not been started yet.")
+            return DimonError.NOTFOUND
+
         res = self.proc.remove_task(pid)
         if res == DimonError.SUCCESS:
             try:
@@ -202,8 +210,11 @@ class Dimon():
         return res
 
     def remove_socket(self, sock):
+        if not self.sock:
+            logging.error("Dimon SockMonitor has not been started yet.")
+            return DimonError.NOTFOUND
         # TODO
-        return self.proc.remove_task(sock)
+        return self.sock.remove_task(sock)
 
     def remove_target_latency(self, target):
         if target in self.late:
