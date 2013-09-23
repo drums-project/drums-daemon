@@ -48,10 +48,10 @@ class HostMonitor(TaskBase):
     def remove_task_core(self, task):
         try:
             del self.task_map['host']
-            return DimonErrorSUCCESS
+            return DimonError.SUCCESS
         except KeyError:
             logging.error("Error removing host")
-            return DimonErrorNOTFOUND
+            return DimonError.NOTFOUND
 
     def do(self):
         data = dict()
