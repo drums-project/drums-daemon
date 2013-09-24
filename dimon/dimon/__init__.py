@@ -218,12 +218,13 @@ class Dimon():
 
     def remove_target_latency(self, target):
         if target in self.late:
-            self.late[target].remove_task(target)
-            self.late[target].stop()
+            res = self.late[target].remove_task(target)
+            self._shutdown_monitor(self.late[target])
             try:
                 with self.lock:
                     del self.callback_map[target]
                 del self.late[target]
+                return res
             except KeyError:
                 logging.error("KeyError while deleting latency task. This should never happen")
                 return DimonError.UNEXPECTED

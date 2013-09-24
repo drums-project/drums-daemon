@@ -53,8 +53,8 @@ class LatencyMonitor(TaskBase):
             try:
                 delay = do_one(self.target, timeout = 2, psize = 64)
                 success += 1
-            except socket.error as e:
-                err = e[1]
+            except socket.error, msg:
+                err = msg[0]
                 continue
 
             if delay != None:
