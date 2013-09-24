@@ -125,6 +125,7 @@ class SocketMonitor(TaskBase):
         # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
         self.data['__ppc__'] = self.packets_per_callback
+        self.data['timestamp'] = time.time()
 
         _data = dict()
         _data['sock'] = self.data

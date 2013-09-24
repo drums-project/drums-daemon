@@ -82,6 +82,7 @@ class ProcessMonitor(TaskBase):
 
         if data:
             try:
+                data[pid]['timestamp'] = time.time()
                 self.result_queue.put(data)
             except Queue.Full:
                 logging.error("[in %s] Output queue is full in"

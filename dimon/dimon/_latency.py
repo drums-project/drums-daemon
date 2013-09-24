@@ -75,7 +75,7 @@ class LatencyMonitor(TaskBase):
         dummy['max'] = mxrtt
         dummy['min'] = mnrtt
         dummy['error'] = err
-
+        dummy['timestamp'] = time.time()
         data = dict()
         data[self.target] = dummy
 
