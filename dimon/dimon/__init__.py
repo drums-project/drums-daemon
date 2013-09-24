@@ -143,10 +143,11 @@ class Dimon():
         return res
 
     def create_monitor_socket(self, callback, inet = "any"):
-        self.socket_inet = inet
-        self._create_socket_monitor()
-        with self.lock:
-            self.callback_map['sock'] = callback
+        if not self.sock:
+            self.socket_inet = inet
+            self._create_socket_monitor()
+            with self.lock:
+                self.callback_map['sock'] = callback
         return DimonError.SUCCESS
 
     def add_socket_to_monitor(self, sock):

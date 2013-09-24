@@ -128,7 +128,7 @@ class SocketMonitor(TaskBase):
 
         _data = dict()
         _data['sock'] = self.data
-        pprint(_data)
+        #pprint(_data)
         if self.packets_per_callback > 0:
             try:
                 self.result_queue.put(_data)
