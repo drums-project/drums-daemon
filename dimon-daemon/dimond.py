@@ -65,17 +65,17 @@ class DimonDaemon(object):
 
     def _callback_pid(self, pid, data):
         #pprint(data)
-        self.sock.send(msgpack.dumps({('pid',pid) : data}))
+        self.sock.send(msgpack.dumps({'type': 'pid', 'key' : pid, 'data' : data}))
 
     def _callback_host(self, host, data):
-        self.sock.send(msgpack.dumps({('host', host) : data}))
+        self.sock.send(msgpack.dumps({'type': 'host', 'key' : 'host', 'data' : data}))
 
     def _callback_latency(self, target, data):
-        self.sock.send(msgpack.dumps({('latency', target) : data}))
+        self.sock.send(msgpack.dumps({'type': 'latency', 'key' : target, 'data' : data}))
 
     # Data is not fine-grained per filter
     def _callback_sock(self, sock, data):
-        self.sock.send(msgpack.dumps({('socket', sock) : data}))
+        self.sock.send(msgpack.dumps({'type': 'socket', 'key' : 'socket', 'data' : data}))
 
     # These are called in Bottle thread's context
     def get_info(self):
