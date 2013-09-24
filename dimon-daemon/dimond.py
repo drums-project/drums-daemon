@@ -25,8 +25,6 @@ __err_map = {
     DimonError.UNEXPECTED: 500
 }
 
-
-
 def http_response(err):
     bottle.response.status = __err_map.get(err, 400)
 
@@ -67,13 +65,17 @@ class DimonDaemon(object):
 
     def _callback_pid(self, pid, data):
         #pprint(data)
-        self.sock.send(msgpack.dumps(data))
+        self.sock.send(msgpack.dumps({('pid',pid) : data}))
 
     def _callback_host(self, host, data):
-        self.sock.send(msgpack.dumps(data))
+        self.sock.send(msgpack.dumps({('host', host) : data}))
 
     def _callback_latency(self, target, data):
-        self.sock.send(msgpack.dumps(data))
+        self.sock.send(msgpack.dumps({('latency', target) : data}))
+
+    # Data is not fine-grained per filter
+    def _callback_sock(self, sock, data):
+        self.sock.send(msgpack.dumps({('socket', sock) : data}))
 
     # These are called in Bottle thread's context
     def get_info(self):
@@ -106,6 +108,21 @@ class DimonDaemon(object):
         else:
             http_response(DimonError.NOTFOUND)
 
+    def add_socket(self, proto, direction, port):
+        # This will happen if necessary
+        res = self.dimon.create_monitor_socket(self._callback_sock)
+        if  res == DimonError.SUCCESS:
+            if direction == "bi":
+                direction = ""
+            http_response(self.dimon.add_socket_to_monitor((proto, direction, port)))
+        else:
+            http_response(res)
+
+    def remove_socket(self, proto, direction, port):
+        if direction == "bi":
+                direction = ""
+        http_response(self.dimon.remove_socket((proto, direction, port)))
+
 if __name__ == "__main__":
     config = dict()
 
@@ -125,6 +142,9 @@ if __name__ == "__main__":
     bottle.route(rp + "/monitor/host", "DELETE", app.disable_host)
     bottle.route(rp + "/monitor/latency/<target>", "POST", app.add_latency)
     bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_latency)
+    bottle.route(rp + "/monitor/socket/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>", "POST", app.add_socket)
+    bottle.route(rp + "/monitor/socket/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>", "DELETE", app.remove_socket)
+    #bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_socket)
 
     server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "localhost"), 'port': config.get("port", 8001)})
     server.daemon = True;
