@@ -107,8 +107,10 @@ class DimonDaemon(object):
             http_response(DimonError.NOTFOUND)
 
 if __name__ == "__main__":
-
     config = dict()
+
+    # TODO: Level
+    logging.basicConfig(filename=config.get('logfile', 'dimond.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
     rp = "/dimon/api/%s" % (__api__,)
 
     logging.info("Starting dimon-daemon.")
@@ -123,8 +125,6 @@ if __name__ == "__main__":
     bottle.route(rp + "/monitor/host", "DELETE", app.disable_host)
     bottle.route(rp + "/monitor/latency/<target>", "POST", app.add_latency)
     bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_latency)
-
-
 
     server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "localhost"), 'port': config.get("port", 8001)})
     server.daemon = True;
