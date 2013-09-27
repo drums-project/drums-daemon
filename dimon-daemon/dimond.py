@@ -8,7 +8,8 @@ version_info = tuple([int(num) for num in __version__.split('.')])
 
 import logging
 import re
-from threading import Thread, current_thread
+from threading import Thread, Lock
+from copy import copy
 
 import bottle
 import zmq
@@ -27,6 +28,75 @@ __err_map = {
 
 def http_response(err):
     bottle.response.status = __err_map.get(err, 400)
+
+
+# Fine-grained thread safe cache for on-demand data
+class MsgpackSafeCache:
+    def __init__(self):
+        self.index = dict()
+        self.caches = dict()
+        self.locks = dict()
+        self.index_lock = Lock()
+
+    def _key(self, _type, key):
+        return str(_type) + str(key)
+
+    def remove_key(self, _type, key):
+        k = self._key(_type, key)
+        with self.index_lock:
+            try:
+                del self.index[k]
+                del self.locks[k]
+                del self.caches[k]
+            except KeyError:
+                return False
+        return True
+
+    def put(self, _type, key, data):
+        k = self._key(_type, key)
+        with self.index_lock:
+            if not k in self.index:
+                self.index[k] = True
+                self.locks[k] = Lock()
+                self.caches[k] = dict()
+
+        with self.locks[k]:
+            self.caches[k] = copy(data)
+
+    # returns json
+    def get(self, _type, key, key_path = None):
+        k = self._key(_type, key)
+        with self.index_lock:
+            if not k in self.index:
+                return None
+
+        with self.locks[k]:
+            if not key_path:
+                # TODO: Should we do an extra copy?
+                return msgpack.loads(self.caches[k])
+            else:
+                path = key_path.split('/')
+                # Hard limit to avoid nasty lengthy requests
+                if len(path) > 7 or len(path) < 1:
+                    return None
+                else:
+                    cached = msgpack.loads(self.caches[k])
+                    data = dict()
+                    data['type'] = cached['type']+'/'+ key_path
+                    data['key'] = cached['key']
+                    data['timestamp'] = cached['data'].get('timestamp', None)
+
+                    d = cached['data']
+                    for segment in path:
+                        if segment in d:
+                            d = d[segment]
+                        else:
+                            # Path does not exists
+                            return None
+                    data['data'] = d
+                    return copy(data)
+
+
 
 class DimonDaemon(object):
     def __init__(self, config = dict(), debug = None):
@@ -51,6 +121,12 @@ class DimonDaemon(object):
         self.__host_regex = re.compile("(?=^.{1,254}$)(^(?:(?!\d|-)[a-zA-Z0-9\-]{1,63}(?<!-)\.?)+(?:[a-zA-Z]{2,})$)")
         self.__ip_regex = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 
+
+        self.cache_sock = MsgpackSafeCache()
+        self.cache_host = MsgpackSafeCache()
+        self.cache_latency = MsgpackSafeCache()
+        self.cache_pid = MsgpackSafeCache()
+
     def loop(self):
         while True:
             self.loop_counter += 1
@@ -65,17 +141,25 @@ class DimonDaemon(object):
 
     def _callback_pid(self, pid, data):
         #pprint(data)
-        self.sock.send(msgpack.dumps({'type': 'pid', 'key' : pid, 'data' : data}))
+        d = msgpack.dumps({'type': 'pid', 'key' : pid, 'data' : data})
+        self.sock.send(d)
+        self.cache_pid.put('pid', pid, d)
 
     def _callback_host(self, host, data):
-        self.sock.send(msgpack.dumps({'type': 'host', 'key' : 'host', 'data' : data}))
+        d = msgpack.dumps({'type': 'host', 'key' : 'host', 'data' : data})
+        self.sock.send(d)
+        self.cache_host.put('host', 'host', d)
 
     def _callback_latency(self, target, data):
-        self.sock.send(msgpack.dumps({'type': 'latency', 'key' : target, 'data' : data}))
+        d = msgpack.dumps({'type': 'latency', 'key' : target, 'data' : data})
+        self.sock.send(d)
+        self.cache_latency.put('latency', target, d)
 
     # Data is not fine-grained per filter
     def _callback_sock(self, sock, data):
-        self.sock.send(msgpack.dumps({'type': 'socket', 'key' : 'socket', 'data' : data}))
+        d = msgpack.dumps({'type': 'socket', 'key' : 'socket', 'data' : data})
+        self.sock.send(d)
+        self.cache_sock.put('socket', 'socket', d)
 
     # These are called in Bottle thread's context
     def get_info(self):
@@ -85,10 +169,21 @@ class DimonDaemon(object):
                 "zmq_publish": self.zmq_addr}
 
     def add_pid(self, pid):
+        # Cache entry will be created automatically on first callback call
         http_response(self.dimon.monitor_pid(pid, self._callback_pid))
 
     def remove_pid(self, pid):
+        # Cache entry should manually be removed
+        self.cache_pid.remove_key('pid', pid)
         http_response(self.dimon.remove_pid(pid))
+
+    def get_pid(self, pid, key_path = None):
+        print "Path is ", key_path
+        d = self.cache_pid.get('pid', pid, key_path)
+        if d:
+            return d
+        else:
+            http_response(DimonError.NOTFOUND)
 
     def enable_host(self):
         http_response(self.dimon.monitor_host(self._callback_host))
@@ -138,6 +233,9 @@ if __name__ == "__main__":
     bottle.route(rp + "/info", "GET", app.get_info)
     bottle.route(rp + "/monitor/pid/<pid:int>", "POST", app.add_pid)
     bottle.route(rp + "/monitor/pid/<pid:int>", "DELETE", app.remove_pid)
+    bottle.route(rp + "/monitor/pid/<pid:int>", "POST", app.add_pid)
+    bottle.route(rp + "/monitor/pid/<pid:int>", "GET", app.get_pid)
+    bottle.route(rp + "/monitor/pid/<pid:int>/<key_path:path>", "GET", app.get_pid)
     bottle.route(rp + "/monitor/host", "POST", app.enable_host)
     bottle.route(rp + "/monitor/host", "DELETE", app.disable_host)
     bottle.route(rp + "/monitor/latency/<target>", "POST", app.add_latency)
@@ -146,7 +244,7 @@ if __name__ == "__main__":
     bottle.route(rp + "/monitor/socket/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>", "DELETE", app.remove_socket)
     #bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_socket)
 
-    server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "localhost"), 'port': config.get("port", 8001)})
+    server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "0.0.0.0"), 'port': config.get("port", 8001)})
     server.daemon = True;
     server.start()
     app.loop()
