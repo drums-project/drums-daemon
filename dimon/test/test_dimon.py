@@ -151,8 +151,8 @@ class SocketTaskTest(unittest.TestCase):
         #self.p2 = os.pipe()
 
         cmds = list()
-        cmds.append("netcat -l -p 3333 > /dev/null")
-        cmds.append("netcat -l -u -p 4444 > /dev/null")
+        cmds.append("netcat -l 3333 > /dev/null")
+        cmds.append("netcat -l -u 4444 > /dev/null")
         cmds.append("netcat localhost 3333 < /dev/urandom")
         cmds.append("netcat -u localhost 4444 < /dev/urandom")
 
@@ -279,7 +279,7 @@ class DimonTest(unittest.TestCase):
         self.p_list = list()
 
         cmds = list()
-        cmds.append("netcat -l -p 3333 > /dev/null")
+        cmds.append("netcat -l 3333 > /dev/null")
         cmds.append("netcat localhost 3333 < /dev/urandom")
 
         for c in cmds:
