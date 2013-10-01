@@ -76,7 +76,7 @@ class SocketMonitor(TaskBase):
     def register_task_core(self, task):
         proto, direction, port, filter_str = tasktuple_to_filterstr(task)
         self.task_map[filter_str] = True
-        self.data[proto][port] = 0
+        self.data[proto][str(port)] = 0
         self.update_filters()
         return DimonError.SUCCESS
 
@@ -84,7 +84,7 @@ class SocketMonitor(TaskBase):
         try:
             proto, direction, port, filter_str = tasktuple_to_filterstr(task)
             del self.task_map[filter_str]
-            del self.data[proto][port]
+            del self.data[proto][str(port)]
             self.update_filters()
             return DimonError.SUCCESS
         except KeyError:
@@ -113,11 +113,11 @@ class SocketMonitor(TaskBase):
             # are not distinguishable. The hack here is to cache the port numbers only
             # and see which port address field matches the cached list.
             if isinstance(tpacket, ImpactPacket.TCP):
-                populate_data(self.data['tcp'], tpacket.get_th_sport(), packet_len)
-                populate_data(self.data['tcp'], tpacket.get_th_dport(), packet_len)
+                populate_data(self.data['tcp'], str(tpacket.get_th_sport()), packet_len)
+                populate_data(self.data['tcp'], str(tpacket.get_th_dport()), packet_len)
             elif isinstance(tpacket, ImpactPacket.UDP):
-                populate_data(self.data['udp'], tpacket.get_uh_sport(), packet_len)
-                populate_data(self.data['udp'], tpacket.get_uh_dport(), packet_len)
+                populate_data(self.data['udp'], str(tpacket.get_uh_sport()), packet_len)
+                populate_data(self.data['udp'], str(tpacket.get_uh_dport()), packet_len)
         if not self.task_map:
             return
 
@@ -130,6 +130,7 @@ class SocketMonitor(TaskBase):
         _data = dict()
         _data['sock'] = self.data
         #pprint(_data)
+        # TODO: The first packet should be sent (0, 0, ...)
         if self.packets_per_callback > 0:
             try:
                 self.result_queue.put(_data)

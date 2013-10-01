@@ -192,11 +192,11 @@ class SocketTaskTest(unittest.TestCase):
             time.sleep(0.5)
             d = q.get()
             pprint(d)
-            byte_count = d['sock']['tcp'][3333]
+            byte_count = d['sock']['tcp']['3333']
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
-            byte_count = d['sock']['udp'][4444]
+            byte_count = d['sock']['udp']['4444']
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
@@ -310,7 +310,7 @@ class DimonTest(unittest.TestCase):
 
         def callback_sock(sock, data):
             self.flag_sock += 1
-            self.assertGreater(data['tcp'][3333], 0)
+            self.assertGreater(data['tcp']['3333'], 0)
 
         def callback_late(target, data):
             self.flag_late += 1
@@ -321,7 +321,7 @@ class DimonTest(unittest.TestCase):
         self.d.monitor_pid(self.pid_another, callback_another)
         self.d.monitor_host(callback_host)
         self.d.create_monitor_socket(callback_sock)
-        self.d.add_socket_to_monitor(('tcp', 'dst', 3333))
+        self.d.add_socket_to_monitor(('tcp', 'dst', '3333'))
         self.d.monitor_target_latency('localhost', callback_late)
         self.d.monitor_target_latency('google.co.jp', callback_late)
         for i in range(20):
