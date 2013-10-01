@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 __version__ = "0.1.0"
-__api__ = "1.0"
+# Who needs precision for API version?
+__api__ = "1"
 
 version_info = tuple([int(num) for num in __version__.split('.')])
 
@@ -122,7 +123,7 @@ class DimonDaemon(object):
         self.__ip_regex = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 
 
-        self.cache_sock = MsgpackSafeCache()
+        self.cache_socket = MsgpackSafeCache()
         self.cache_host = MsgpackSafeCache()
         self.cache_latency = MsgpackSafeCache()
         self.cache_pid = MsgpackSafeCache()
@@ -130,7 +131,7 @@ class DimonDaemon(object):
     def loop(self):
         while True:
             self.loop_counter += 1
-            print ">>> loop ", self.loop_counter
+            #print ">>> loop ", self.loop_counter
             try:
                 # This is a blocking call
                 self.dimon.spin_once()
@@ -159,7 +160,7 @@ class DimonDaemon(object):
     def _callback_sock(self, sock, data):
         d = msgpack.dumps({'type': 'socket', 'key' : 'socket', 'data' : data})
         self.sock.send(d)
-        self.cache_sock.put('socket', 'socket', d)
+        self.cache_socket.put('socket', 'socket', d)
 
     # These are called in Bottle thread's context
     def get_info(self):
@@ -178,7 +179,6 @@ class DimonDaemon(object):
         http_response(self.dimon.remove_pid(pid))
 
     def get_pid(self, pid, key_path = None):
-        print "Path is ", key_path
         d = self.cache_pid.get('pid', pid, key_path)
         if d:
             return d
@@ -191,6 +191,13 @@ class DimonDaemon(object):
     def disable_host(self):
         http_response(self.dimon.remove_host())
 
+    def get_host(self, key_path = None):
+        d = self.cache_host.get('host', 'host', key_path)
+        if d:
+            return d
+        else:
+            http_response(DimonError.NOTFOUND)
+
     def add_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
             http_response(self.dimon.monitor_target_latency(target, self._callback_latency))
@@ -200,6 +207,15 @@ class DimonDaemon(object):
     def remove_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
             http_response(self.dimon.remove_target_latency(target))
+        else:
+            http_response(DimonError.NOTFOUND)
+
+    def get_latency(self, target, key_path = None):
+        if not (self.__host_regex.match(target) or self.__ip_regex.match(target)):
+            http_response(DimonError.NOTFOUND)
+        d = self.cache_latency.get('latency', target, key_path)
+        if d:
+            return d
         else:
             http_response(DimonError.NOTFOUND)
 
@@ -218,12 +234,27 @@ class DimonDaemon(object):
                 direction = ""
         http_response(self.dimon.remove_socket((proto, direction, port)))
 
+    def get_socket(self, key_path = None):
+        d = self.cache_socket.get('socket', 'socket', key_path)
+        if d:
+            return d
+        else:
+            http_response(DimonError.NOTFOUND)
+
 if __name__ == "__main__":
     config = dict()
 
     # TODO: Level
     logging.basicConfig(filename=config.get('logfile', 'dimond.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
-    rp = "/dimon/api/%s" % (__api__,)
+    rp = "/dimon/v/%s" % (__api__,)
+
+    path_pid_base = rp + "/monitor/pid"
+    path_pid = path_pid_base + "/<pid:int>"
+    path_host = rp + "/monitor/host"
+    path_latency_base = rp + "/monitor/latency"
+    path_latency = path_latency_base + "/<target>"
+    path_socket_base = rp + "/monitor/socket"
+    path_socket = path_socket_base + "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
 
     logging.info("Starting dimon-daemon.")
     app = DimonDaemon(config)
@@ -231,18 +262,27 @@ if __name__ == "__main__":
     ### Routes
     bottle.debug(True)
     bottle.route(rp + "/info", "GET", app.get_info)
-    bottle.route(rp + "/monitor/pid/<pid:int>", "POST", app.add_pid)
-    bottle.route(rp + "/monitor/pid/<pid:int>", "DELETE", app.remove_pid)
-    bottle.route(rp + "/monitor/pid/<pid:int>", "POST", app.add_pid)
-    bottle.route(rp + "/monitor/pid/<pid:int>", "GET", app.get_pid)
-    bottle.route(rp + "/monitor/pid/<pid:int>/<key_path:path>", "GET", app.get_pid)
-    bottle.route(rp + "/monitor/host", "POST", app.enable_host)
-    bottle.route(rp + "/monitor/host", "DELETE", app.disable_host)
-    bottle.route(rp + "/monitor/latency/<target>", "POST", app.add_latency)
-    bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_latency)
-    bottle.route(rp + "/monitor/socket/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>", "POST", app.add_socket)
-    bottle.route(rp + "/monitor/socket/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>", "DELETE", app.remove_socket)
-    #bottle.route(rp + "/monitor/latency/<target>", "DELETE", app.remove_socket)
+
+    bottle.route(path_pid, "POST", app.add_pid)
+    bottle.route(path_pid, "DELETE", app.remove_pid)
+    bottle.route(path_pid, "GET", app.get_pid)
+    bottle.route(path_pid + "/<key_path:path>", "GET", app.get_pid)
+
+    bottle.route(path_host, "POST", app.enable_host)
+    bottle.route(path_host, "DELETE", app.disable_host)
+    bottle.route(path_host, "GET", app.get_host)
+    bottle.route(path_host + "/<key_path:path>", "GET", app.get_host)
+
+    bottle.route(path_latency, "POST", app.add_latency)
+    bottle.route(path_latency, "DELETE", app.remove_latency)
+    bottle.route(path_latency, "GET", app.get_latency)
+    bottle.route(path_latency + "/<key_path:path>", "GET", app.get_latency)
+
+
+    bottle.route(path_socket, "POST", app.add_socket)
+    bottle.route(path_socket, "DELETE", app.remove_socket)
+    bottle.route(path_socket_base, "GET", app.get_socket)
+    bottle.route(path_socket_base + "/<key_path:path>", "GET", app.get_socket)
 
     server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "0.0.0.0"), 'port': config.get("port", 8001)})
     server.daemon = True;
