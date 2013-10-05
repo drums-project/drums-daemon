@@ -13,11 +13,11 @@ if concurrency_impl == 'gevent':
     import gevent.monkey; gevent.monkey.patch_all()
 
 if concurrency_impl in ['gevent', 'threading']:
-    #from Queue import Queue as JoinableQueue
     from threading import Thread, Event, Lock
     from Queue import Queue, Empty, Full
 if concurrency_impl == 'multiprocessing':
-    from multiprocessing import Process, Queue, Event#, JoinableQueue
+    from multiprocessing import Process as Thread
+    from multiprocessing import Queue, Event
     from Queue import Empty, Full
 
 import sys
@@ -53,6 +53,8 @@ def psutil_convert(data):
             return data
     else:
         return data
+
+# TODO: Merge these classes
 
 class TaskCommon():
     def __init__(self, result_queue, default_interval):
@@ -102,106 +104,69 @@ class TaskCommon():
         """
         raise NotImplementedError
 
-if concurrency_impl in ['gevent', 'threading']:
-    class TaskBase(TaskCommon, Thread):
-        def __init__(self, result_queue, default_interval, name = ""):
-            TaskCommon.__init__(self, result_queue, default_interval)
-            Thread.__init__(self, target = None, name = name)
-            # TODO: Should all tasks be daemons?
-            self.daemon = True
-            self.task_map_lock = Lock()
+class TaskBase(TaskCommon, Thread):
+    def __init__(self, result_queue, default_interval, name = ""):
+        TaskCommon.__init__(self, result_queue, default_interval)
+        Thread.__init__(self, target = None, name = name)
+        # TODO: Should all tasks be daemons?
+        #self.daemon = True
+        self.cmd_queue = Queue()
+        self.feedback_queue = Queue()
+        self.daemon = True
 
-        def register_task(self, task):
-            with self.task_map_lock:
-                return self.register_task_core(task)
-
-        def remove_task(self, task):
-            with self.task_map_lock:
-                return self.remove_task_core(task)
-
-        def run(self):
-            """
-            The main loop
-            """
+    def register_task(self, task):
+        try:
+            self.cmd_queue.put(('a', task))
+            # Wait 5 seconds for the feeback
             try:
-                self._last_loop_time = time.time()
-                while not self._terminate_event.is_set():
-                    with self.task_map_lock:
-                        self.do()
-                    diff = time.time() - self._last_loop_time
-                    sleep_time = self._default_interval - diff
-                    try:
-                        time.sleep(sleep_time)
-                    except:
-                        logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
-                    self._last_loop_time = time.time()
-                logging.debug("Task %s terminated.", self)
-            except:
-                print "Task(%s) exited with '%s'" % (self.name, sys.exc_info())
+                return self.feedback_queue.get(block = True, timeout = 5)
+            except Empty:
+                return DimonError.TIMEOUT
+        except Full:
+            logging.error("Queue is full %s", self)
 
-elif concurrency_impl == 'multiprocessing':
-    class TaskBase(TaskCommon, Process):
-        def __init__(self, result_queue, default_interval, name = ""):
-            TaskCommon.__init__(self, result_queue, default_interval)
-            Process.__init__(self, target = None, name = name)
-            # TODO: Should all tasks be daemons?
-            #self.daemon = True
-            self.cmd_queue = Queue()
-            self.feedback_queue = Queue()
-
-        def register_task(self, task):
+    def remove_task(self, task):
+        try:
+            self.cmd_queue.put(('r', task))
             try:
-                self.cmd_queue.put(('a', task))
                 # Wait 5 seconds for the feeback
-                try:
-                    return self.feedback_queue.get(block = True, timeout = 5)
-                except Empty:
-                    return DimonError.TIMEOUT
-            except Full:
-                logging.error("Queue is full %s", self)
+                return self.feedback_queue.get(block = True, timeout = 5)
+            except Empty:
+                return DimonError.TIMEOUT
+        except Full:
+            logging.error("Queue is full %s", self)
 
-        def remove_task(self, task):
-            try:
-                self.cmd_queue.put(('r', task))
+    def run(self):
+        """
+        The main loop
+        """
+        try:
+            self._last_loop_time = time.time()
+            while not self._terminate_event.is_set():
+                # Process command queue
+                while not self.cmd_queue.empty():
+                    cmd, task = self.cmd_queue.get()
+                    # Send feedback using feedback_queue
+                    if cmd == 'a':
+                        self.feedback_queue.put(self.register_task_core(task))
+                    elif cmd == 'r':
+                        self.feedback_queue.put(self.remove_task_core(task))
+                    else:
+                        raise ValueError("cmd %s not recognized in %s" % (cmd, self))
+                self.do()
+                diff = time.time() - self._last_loop_time
+                sleep_time = self._default_interval - diff
                 try:
-                    # Wait 5 seconds for the feeback
-                    return self.feedback_queue.get(block = True, timeout = 5)
-                except Empty:
-                    return DimonError.TIMEOUT
-            except Full:
-                logging.error("Queue is full %s", self)
-
-        def run(self):
-            """
-            The main loop
-            """
-            try:
+                    time.sleep(sleep_time)
+                except:
+                    logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                 self._last_loop_time = time.time()
-                while not self._terminate_event.is_set():
-                    # Process command queue
-                    while not self.cmd_queue.empty():
-                        cmd, task = self.cmd_queue.get()
-                        # Send feedback using feedback_queue
-                        if cmd == 'a':
-                            self.feedback_queue.put(self.register_task_core(task))
-                        elif cmd == 'r':
-                            self.feedback_queue.put(self.remove_task_core(task))
-                        else:
-                            raise ValueError("cmd %s not recognized in %s" % (cmd, self))
-                    self.do()
-                    diff = time.time() - self._last_loop_time
-                    sleep_time = self._default_interval - diff
-                    try:
-                        time.sleep(sleep_time)
-                    except:
-                        logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
-                    self._last_loop_time = time.time()
 
 
-                while not self.feedback_queue.empty():
-                    self.feedback_queue.get()
-                logging.debug("Task %s terminated.", self)
-            except:
-                print "Task(%s) exited with '%s'" % (self.name, sys.exc_info())
+            while not self.feedback_queue.empty():
+                self.feedback_queue.get()
+            logging.debug("Task %s terminated.", self)
+        except:
+            print "Task(%s) exited with '%s'" % (self.name, sys.exc_info())
 
-            return True
+        return True
