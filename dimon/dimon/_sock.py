@@ -69,7 +69,7 @@ class SocketMonitor(TaskBase):
         filters = ["(%s)" % (f,) for f in self.task_map.keys()]
         self.filter_str = " or ".join(filters)
         logging.debug("Updating pcap filter to `%s`" % (self.filter_str,))
-        print "Setting filter to %s" % self.filter_str
+        #print "Setting filter to %s" % self.filter_str
         self.pc.setfilter(self.filter_str)
 
 
