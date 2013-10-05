@@ -34,12 +34,13 @@ class BasicTask(TaskBase):
             return DimonError.NOTFOUND
 
     def do(self):
-        sys.stdout.write('>')
-        sys.stdout.flush()
-        self.task_map = {key:val+1 for key,val in self.task_map.items()}
-        #if self.result_queue.empty():
-        #pprint(self.task_map)
-        self.result_queue.put(self.task_map)
+        if self.task_map:
+            sys.stdout.write('>')
+            sys.stdout.flush()
+            self.task_map = {key:val+1 for key,val in self.task_map.items()}
+            #if self.result_queue.empty():
+            #pprint(self.task_map)
+            self.result_queue.put(self.task_map)
 
 class TaskBaseTest(unittest.TestCase):
     def test_basic_task_loop(self):
@@ -48,11 +49,11 @@ class TaskBaseTest(unittest.TestCase):
         task.start()
         task.register_task('t1')
         try:
-            time.sleep(0.1)
+            time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 1)
             task.register_task('t2')
-            time.sleep(0.1)
+            time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 2)
             time.sleep(0.5)
@@ -256,7 +257,7 @@ class LatencyTaskTest(unittest.TestCase):
             try:
                 d = q.get(block = True, timeout = 5)
             except Empty:
-                self.fail("Socket monitor did not report anything in 5 seconds")
+                self.fail("Latency monitor did not report anything in 5 seconds")
             self.assertNotEqual(d[invalid_domain]['error'], None)
         finally:
             task.set_terminate_event()
@@ -324,7 +325,8 @@ class DimonTest(unittest.TestCase):
         self.d.add_socket_to_monitor(('tcp', 'dst', '3333'))
         self.d.monitor_target_latency('localhost', callback_late)
         self.d.monitor_target_latency('google.co.jp', callback_late)
-        for i in range(20):
+        print "Spinning for 100 times ..."
+        for i in range(100):
             self.d.spin_once()
 
         #print self.flag, self.flag_another, self.flag_host
