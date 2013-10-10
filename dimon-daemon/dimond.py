@@ -88,14 +88,16 @@ class MsgpackSafeCache:
                     data['timestamp'] = cached['data'].get('timestamp', None)
 
                     d = cached['data']
-                    for segment in path:
-                        if segment in d:
-                            d = d[segment]
-                        else:
-                            # Path does not exists
-                            return None
-                    data['data'] = d
-                    return copy(data)
+                    try:
+                        d = reduce(lambda d, key: d.get(key, None), path, d)
+                    except AttributeError:
+                        d = None
+
+                    if d:
+                        data['data'] = d
+                        return copy(data)
+                    else:
+                        return None
 
 
 
@@ -246,6 +248,8 @@ if __name__ == "__main__":
 
     # TODO: Level
     logging.basicConfig(filename=config.get('logfile', 'dimond.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
+
+    # TODO: API version should be static for each call, not from __api__
     rp = "/dimon/v/%s" % (__api__,)
 
     path_pid_base = rp + "/monitor/pid"
