@@ -55,23 +55,30 @@ def psutil_convert(data):
         return data
 
 # TODO: Merge these classes
-
-class TaskCommon():
-    def __init__(self, result_queue, default_interval):
+class TaskBase(Thread):
+    def __init__(self, result_queue, default_interval, name = ""):
+        Thread.__init__(self, target = None, name = name)
+        assert default_interval > 0
         self._default_interval = default_interval
         # TODO: Check the overhead of calling 2 time() per loop
         self._last_loop_time = time.time()
         self._terminate_event = Event()
         self.task_map = dict()
         self.result_queue = result_queue
+        # TODO: Should all tasks be daemons?
+        self.cmd_queue = Queue()
+        self.feedback_queue = Queue()
+        self.daemon = True
 
     def __repr__(self):
         name =  self.__class__.__name__
         return '<%s at %#x>' % (name, id(self))
 
+    # TODO: Not Thread Safe
     def set_interval(self, interval):
         self._default_interval = interval
 
+    # TODO: Not Thread Safe
     def get_interval(self):
         return self._default_interval
 
@@ -84,35 +91,6 @@ class TaskCommon():
 
     def set_terminate_event(self):
         self._terminate_event.set()
-
-    def register_task(self, task):
-        raise NotImplementedError
-
-    def register_task_core(self, task):
-        raise NotImplementedError
-
-    def remove_task(self, task):
-        raise NotImplementedError
-
-    def remove_task_core(self, task):
-        raise NotImplementedError
-
-    def do(self):
-        """
-        Virtual function that must be defined in subclasses.
-        This function will be executed once in the loop and does the job.
-        """
-        raise NotImplementedError
-
-class TaskBase(TaskCommon, Thread):
-    def __init__(self, result_queue, default_interval, name = ""):
-        TaskCommon.__init__(self, result_queue, default_interval)
-        Thread.__init__(self, target = None, name = name)
-        # TODO: Should all tasks be daemons?
-        #self.daemon = True
-        self.cmd_queue = Queue()
-        self.feedback_queue = Queue()
-        self.daemon = True
 
     def register_task(self, task):
         try:
@@ -161,7 +139,6 @@ class TaskBase(TaskCommon, Thread):
                 except:
                     logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                 self._last_loop_time = time.time()
-
 
             while not self.feedback_queue.empty():
                 self.feedback_queue.get()
