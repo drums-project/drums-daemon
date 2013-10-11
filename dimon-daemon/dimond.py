@@ -115,9 +115,11 @@ class Filter(object):
                 ret_l.append(str(l))
         return ret_l
 
+    def reset(self):
+        self.tree = dict()
+
     def add(self, _type, _key, key_path):
         key = str(_key)
-        print "Request for %s:%s:%s" % (_type, key, key_path)
         # for test only
         path = key_path.split('/')
         if len(path) > 7 or len(path) < 1:
@@ -155,16 +157,19 @@ class Filter(object):
             return data
 
         types = self.__search_keys(self.tree, [data['type'], '~'])
-        print "Matched Types: %s" % types
+        #print "Matched Types: %s" % types
         if not types:
             return None
 
         keys = {}
+        found = False
         for _type in types:
             keys[_type] = self.__search_keys(self.tree[_type], [data['key'], '~'])
+            if keys[_type]:
+                found = True
 
-        print "Matched Keys: %s" % keys
-        if not keys:
+        #print "Matched Keys: %s" % keys
+        if not found:
             return None
 
         ret = {}
@@ -178,7 +183,7 @@ class Filter(object):
             for key in keys[_type]:
                 for key_path in self.tree[_type][key].keys():
                     path = key_path.split('/')
-                    print "Checking Path %s" % path
+                    #print "Checking Path %s" % path
                     try:
                         # This is non-destructive
                         if path[0]:
@@ -193,9 +198,9 @@ class Filter(object):
                     if not d is None:
                         # Traverse back to root
                         ret = ret_root['data']
-                        print "Path is valid"
+                        #print "Path is valid"
                         for p in path:
-                            print "%s/" % p
+                            #print "%s/" % p
                             if not p in ret:
                                 ret[p] = dict()
                             prev = ret
@@ -250,33 +255,41 @@ class DimonDaemon(object):
                 self.dimon.shutdown()
                 return True
 
+    def __send_data_filtered(self, d, d_packed):
+        d_filtered = self.data_filter.apply(d)
+        if d_filtered:
+            if d_filtered == d:
+                # if no filtering applied to data, do not pack it again
+                self.sock.send(d_packed)
+            else:
+                self.sock.send(msgpack.dumps(d_filtered))
+
     def _callback_pid(self, pid, data):
         #pprint(data)
         d = {'type': 'pid', 'key' : pid, 'data' : data}
-        self.cache_pid.put('pid', pid, d)
-        d_filtered = self.data_filter.apply(d)
-        if d_filtered:
-            self.sock.send(msgpack.dumps(d_filtered))
+        d_packed = msgpack.dumps(d)
+        self.cache_pid.put('pid', pid, d_packed)
+        self.__send_data_filtered(d, d_packed)
 
 
     def _callback_host(self, host, data):
         d = {'type': 'host', 'key' : 'host', 'data' : data}
-        self.cache_host.put('host', 'host', d)
-        d_filtered = self.data_filter.apply(d)
-        if d_filtered:
-            self.sock.send(msgpack.dumps(d_filtered))
-
+        d_packed = msgpack.dumps(d)
+        self.cache_host.put('host', 'host', d_packed)
+        self.__send_data_filtered(d, d_packed)
 
     def _callback_latency(self, target, data):
-        d = msgpack.dumps({'type': 'latency', 'key' : target, 'data' : data})
-        self.sock.send(d)
-        self.cache_latency.put('latency', target, d)
+        d = {'type': 'latency', 'key' : target, 'data' : data}
+        d_packed = msgpack.dumps(d)
+        self.cache_latency.put('latency', target, d_packed)
+        self.__send_data_filtered(d, d_packed)
 
     # Data is not fine-grained per filter
     def _callback_sock(self, sock, data):
-        d = msgpack.dumps({'type': 'socket', 'key' : 'socket', 'data' : data})
-        self.sock.send(d)
-        self.cache_socket.put('socket', 'socket', d)
+        d = {'type': 'socket', 'key' : 'socket', 'data' : data}
+        d_packed = msgpack.dumps(d)
+        self.cache_socket.put('socket', 'socket', d_packed)
+        self.__send_data_filtered(d, d_packed)
 
     # These are called in Bottle thread's context
     def add_filter(self, kind, key, key_path):
@@ -349,6 +362,18 @@ class DimonDaemon(object):
         else:
             http_response(DimonError.NOTFOUND)
 
+    def add_filter_latency(self, target, key_path):
+        if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
+            return self.add_filter('latency', target, key_path)
+        else:
+            http_response(DimonError.NOTFOUND)
+
+    def remove_filter_latency(self, target, key_path):
+        if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
+            return self.remove_filter('latency', target, key_path)
+        else:
+            http_response(DimonError.NOTFOUND)
+
     def get_latency(self, target, key_path = None):
         if not (self.__host_regex.match(target) or self.__ip_regex.match(target)):
             http_response(DimonError.NOTFOUND)
@@ -373,6 +398,12 @@ class DimonDaemon(object):
                 direction = ""
         http_response(self.dimon.remove_socket((proto, direction, port)))
 
+    def add_filter_socket(self, key_path):
+        return self.add_filter('socket', 'socket', key_path)
+
+    def remove_filter_socket(self, key_path):
+        return self.add_filter('socket', 'socket', key_path)
+
     def get_socket(self, key_path = None):
         d = self.cache_socket.get('socket', 'socket', key_path)
         if d:
@@ -382,6 +413,13 @@ class DimonDaemon(object):
 
     def get_filters(self):
         return str(self.data_filter)
+
+    def remove_filters(self):
+        try:
+           self.data_filter.reset()
+           return http_response(DimonError.SUCCESS)
+        except:
+            return http_response(DimonError.RUNTIME)
 
 if __name__ == "__main__":
     config = dict()
@@ -401,9 +439,12 @@ if __name__ == "__main__":
     path_host_filter = (path_host_base % 'filter')
 
     path_latency_base = rp + "/%s/latency"
-    path_latency = path_latency_base + "/<target>"
+    path_latency_monitor = (path_latency_base % 'monitor') + "/<target>"
+    path_latency_filter = (path_latency_base % 'filter') + "/<target>"
+
     path_socket_base = rp + "/%s/socket"
-    path_socket = path_socket_base + "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
+    path_socket_monitor = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
+    #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
 
     logging.info("Starting dimon-daemon.")
     app = DimonDaemon(config)
@@ -423,21 +464,25 @@ if __name__ == "__main__":
     bottle.route(path_host_monitor, "DELETE", app.disable_host)
     bottle.route(path_host_monitor, "GET", app.get_host)
     bottle.route(path_host_monitor+ "/<key_path:path>", "GET", app.get_host)
-
     bottle.route(path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
     bottle.route(path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
 
-    bottle.route(path_latency  % 'monitor', "POST", app.add_latency)
-    bottle.route(path_latency % 'monitor', "DELETE", app.remove_latency)
-    bottle.route(path_latency % 'monitor', "GET", app.get_latency)
-    bottle.route((path_latency % 'monitor') + "/<key_path:path>", "GET", app.get_latency)
+    bottle.route(path_latency_monitor, "POST", app.add_latency)
+    bottle.route(path_latency_monitor, "DELETE", app.remove_latency)
+    bottle.route(path_latency_monitor, "GET", app.get_latency)
+    bottle.route(path_latency_monitor + "/<key_path:path>", "GET", app.get_latency)
+    bottle.route(path_latency_filter + "/<key_path:path>", "POST", app.add_filter_latency)
+    bottle.route(path_latency_filter + "/<key_path:path>", "DELETE", app.add_filter_latency)
 
-    bottle.route(path_socket % 'monitor', "POST", app.add_socket)
-    bottle.route(path_socket % 'monitor', "DELETE", app.remove_socket)
+    bottle.route(path_socket_monitor, "POST", app.add_socket)
+    bottle.route(path_socket_monitor, "DELETE", app.remove_socket)
     bottle.route(path_socket_base % 'monitor', "GET", app.get_socket)
     bottle.route((path_socket_base % 'monitor') + "/<key_path:path>", "GET", app.get_socket)
+    bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "POST", app.add_filter_socket)
+    bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_socket)
 
-    bottle.route(rp + '/filter/list', "GET", app.get_filters)
+    bottle.route(rp + '/filter', "GET", app.get_filters)
+    bottle.route(rp + '/filter', "DELETE", app.remove_filters)
     #bottle.route(path_filter, "POST", app.add_filter)
     #bottle.route(path_filter, "DELETE", app.remove_filter)
 
