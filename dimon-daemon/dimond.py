@@ -383,8 +383,6 @@ class DimonDaemon(object):
     def get_filters(self):
         return str(self.data_filter)
 
-
-
 if __name__ == "__main__":
     config = dict()
 
@@ -397,7 +395,11 @@ if __name__ == "__main__":
     path_pid_base = rp + "/%s/pid"
     path_pid_monitor = (path_pid_base % 'monitor') + "/<pid:int>"
     path_pid_filter = (path_pid_base % 'filter') + "/<pid:re:[0-9]+|~>"
-    path_host = rp + "/%s/host"
+
+    path_host_base = rp + "/%s/host"
+    path_host_monitor = (path_host_base % 'monitor')
+    path_host_filter = (path_host_base % 'filter')
+
     path_latency_base = rp + "/%s/latency"
     path_latency = path_latency_base + "/<target>"
     path_socket_base = rp + "/%s/socket"
@@ -417,12 +419,13 @@ if __name__ == "__main__":
     bottle.route(path_pid_filter + "/<key_path:path>", "POST", app.add_filter_pid)
     bottle.route(path_pid_filter + "/<key_path:path>", "DELETE", app.remove_filter_pid)
 
-    bottle.route(path_host % 'monitor', "POST", app.enable_host)
-    bottle.route(path_host % 'monitor', "DELETE", app.disable_host)
-    bottle.route(path_host % 'monitor', "GET", app.get_host)
-    bottle.route((path_host  % 'monitor') + "/<key_path:path>", "GET", app.get_host)
-    bottle.route((path_host  % 'filter') + "/<key_path:path>", "POST", app.add_filter_host)
-    bottle.route((path_host  % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_host)
+    bottle.route(path_host_monitor, "POST", app.enable_host)
+    bottle.route(path_host_monitor, "DELETE", app.disable_host)
+    bottle.route(path_host_monitor, "GET", app.get_host)
+    bottle.route(path_host_monitor+ "/<key_path:path>", "GET", app.get_host)
+
+    bottle.route(path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
+    bottle.route(path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
 
     bottle.route(path_latency  % 'monitor', "POST", app.add_latency)
     bottle.route(path_latency % 'monitor', "DELETE", app.remove_latency)
@@ -434,8 +437,7 @@ if __name__ == "__main__":
     bottle.route(path_socket_base % 'monitor', "GET", app.get_socket)
     bottle.route((path_socket_base % 'monitor') + "/<key_path:path>", "GET", app.get_socket)
 
-
-    #bottle.route(path_filter_base, "GET", app.get_filters)
+    bottle.route(rp + '/filter/list', "GET", app.get_filters)
     #bottle.route(path_filter, "POST", app.add_filter)
     #bottle.route(path_filter, "DELETE", app.remove_filter)
 
