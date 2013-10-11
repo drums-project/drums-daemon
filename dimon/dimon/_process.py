@@ -80,14 +80,14 @@ class ProcessMonitor(TaskBase):
                 # this code converts namedtuples to dict
                 data[pid][f] = psutil_convert(dummy)
 
-        if data:
-            try:
-                data[pid]['timestamp'] = time.time()
-                self.result_queue.put(data)
-            except Queue.Full:
-                logging.error("[in %s] Output queue is full in"
-                    % (self, ))
-            finally:
-                pass#pprint(data)
+            if data:
+                try:
+                    data[pid]['timestamp'] = time.time()
+                    self.result_queue.put(data)
+                except Queue.Full:
+                    logging.error("[in %s] Output queue is full in"
+                        % (self, ))
+                finally:
+                    pass#pprint(data)
 
 
