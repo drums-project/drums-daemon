@@ -428,7 +428,7 @@ if __name__ == "__main__":
     logging.basicConfig(filename=config.get('logfile', 'dimond.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
 
     # TODO: API version should be static for each call, not from __api__
-    rp = "/dimon/v/%s" % (__api__,)
+    rp = "/dimon/v%s" % (__api__,)
 
     path_pid_base = rp + "/%s/pid"
     path_pid_monitor = (path_pid_base % 'monitor') + "/<pid:int>"
