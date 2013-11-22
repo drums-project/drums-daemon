@@ -16,6 +16,7 @@ import bottle
 import zmq
 import msgpack
 import json
+import socket
 
 from dimon import Dimon, DimonError
 from pprint import pprint
@@ -225,11 +226,13 @@ class DimonDaemon(object):
             late_wait_between_pings = self.config.get("late_wait_between_pings", 0.1),
             process_fields = self.config.get("process_fields", list()),
             host_fields = self.config.get("host_fields", list()))
-
+        self.hostname = socket.gethostname()
         logging.info("Dimon and Bottle initialized")
+        logging.info("Hostname is %s" % self.hostname)
         self.ctx = zmq.Context()
         self.sock = self.ctx.socket(zmq.PUB)
         self.zmq_addr = "tcp://*:" + str(self.config.get('publish_port', 8002))
+        self.zmq_addr_outside = self.zmq_addr.replace('*', self.hostname)
         self.sock.bind(self.zmq_addr)
         self.loop_counter = 0
         self.data_filter = Filter()
@@ -266,27 +269,27 @@ class DimonDaemon(object):
 
     def _callback_pid(self, pid, data):
         #pprint(data)
-        d = {'type': 'pid', 'key' : pid, 'data' : data}
+        d = {'src': self.hostname, 'type': 'pid', 'key' : pid, 'data' : data}
         d_packed = msgpack.dumps(d)
         self.cache_pid.put('pid', pid, d_packed)
         self.__send_data_filtered(d, d_packed)
 
 
     def _callback_host(self, host, data):
-        d = {'type': 'host', 'key' : 'host', 'data' : data}
+        d = {'src': self.hostname,'type': 'host', 'key' : 'host', 'data' : data}
         d_packed = msgpack.dumps(d)
         self.cache_host.put('host', 'host', d_packed)
         self.__send_data_filtered(d, d_packed)
 
     def _callback_latency(self, target, data):
-        d = {'type': 'latency', 'key' : target, 'data' : data}
+        d = {'src': self.hostname,'type': 'latency', 'key' : target, 'data' : data}
         d_packed = msgpack.dumps(d)
         self.cache_latency.put('latency', target, d_packed)
         self.__send_data_filtered(d, d_packed)
 
     # Data is not fine-grained per filter
     def _callback_sock(self, sock, data):
-        d = {'type': 'socket', 'key' : 'socket', 'data' : data}
+        d = {'src': self.hostname,'type': 'socket', 'key' : 'socket', 'data' : data}
         d_packed = msgpack.dumps(d)
         self.cache_socket.put('socket', 'socket', d_packed)
         self.__send_data_filtered(d, d_packed)
@@ -307,7 +310,7 @@ class DimonDaemon(object):
         return {"name": "Dimon Daemon",
                 "version": __version__,
                 "api_version": __api__,
-                "zmq_publish": self.zmq_addr}
+                "zmq_publish": self.zmq_addr_outside}
 
     def add_pid(self, pid):
         # Cache entry will be created automatically on first callback call
