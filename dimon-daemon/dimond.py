@@ -260,12 +260,13 @@ class DimonDaemon(object):
 
     def __send_data_filtered(self, d, d_packed):
         d_filtered = self.data_filter.apply(d)
+        msg_key = "%s:%s:%s" % (d['src'], d['type'], d['key'])
         if d_filtered:
             if d_filtered == d:
                 # if no filtering applied to data, do not pack it again
-                self.sock.send(d_packed)
+                self.sock.send_multipart([msg_key, d_packed])
             else:
-                self.sock.send(msgpack.dumps(d_filtered))
+                self.sock.send_multipart([msg_key, msgpack.dumps(d_filtered)])
 
     def _callback_pid(self, pid, data):
         #pprint(data)
