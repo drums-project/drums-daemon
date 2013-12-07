@@ -250,6 +250,7 @@ class Dimon():
 
     def spin_once(self):
         # results are dicts, keys are tasks
+        # TODO: BUG get should be non-blocking
         data_pair_dict = self.q.get()
         for task, data in data_pair_dict.items():
             try:
