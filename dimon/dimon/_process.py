@@ -68,10 +68,10 @@ class ProcessMonitor(TaskBase):
                             % (self, f))
                         continue
                 # TODO: Fix the following circular loople
-                except psutil.NoSuchProcess:
+                except psutil.error.NoSuchProcess:
                     logging.warning("NoSuchProcess for %s, removing it", pid)
                     del self.task_map[pid]
-                except psutil.AccessDenied:
+                except psutil.error.AccessDenied:
                     logging.warning("AccessDenied for %s, removing it", pid)
                     del self.task_map[pid]
 
