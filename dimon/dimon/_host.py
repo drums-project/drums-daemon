@@ -35,7 +35,6 @@ class HostMonitor(TaskBase):
                 self.fields.remove('net_io_counters')
                 self.fields.append('network_io_counters')
 
-
     def register_task_core(self, task):
         """
         Adds a pid to the task_map

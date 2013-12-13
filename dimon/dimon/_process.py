@@ -23,7 +23,7 @@ class ProcessMonitor(TaskBase):
         if fields:
             self.fields = list(set(fields))
         else:
-            self.fields = ['name', 'status', 'get_cpu_percent', 'get_cpu_times','get_memory_info', 'get_io_counters', 'get_threads']
+            self.fields = ['name', 'status', 'get_cpu_percent', 'get_cpu_times','get_memory_info', 'get_io_counters', 'get_threads', 'cmdline']
 
     def register_task_core(self, task):
         """
