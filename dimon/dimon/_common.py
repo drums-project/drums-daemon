@@ -144,6 +144,6 @@ class TaskBase(Thread):
                 self.feedback_queue.get()
             logging.debug("Task %s terminated.", self)
         except:
-            print "Task(%s) exited with '%s'" % (self.name, sys.exc_info())
+            logging.warning("Task(%s) exited with '%s'" % (self.name, sys.exc_info()))
 
         return True

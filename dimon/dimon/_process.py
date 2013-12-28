@@ -84,6 +84,9 @@ class ProcessMonitor(TaskBase):
                             % (self, ))
                     finally:
                         pass
+        except AttributeError:
+           logging.warning("Exception: [in %s] Attribute `%s` not found."
+                            % (self, f))
         # TODO: Fix the following circular loople
         except psutil.error.NoSuchProcess:
             logging.warning("NoSuchProcess for %s, removing it", pid)
