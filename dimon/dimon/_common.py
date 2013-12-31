@@ -122,22 +122,38 @@ class TaskBase(Thread):
             self._last_loop_time = time.time()
             while not self._terminate_event.is_set():
                 # Process command queue
-                while not self.cmd_queue.empty():
-                    cmd, task = self.cmd_queue.get()
-                    # Send feedback using feedback_queue
-                    if cmd == 'a':
-                        self.feedback_queue.put(self.register_task_core(task))
-                    elif cmd == 'r':
-                        self.feedback_queue.put(self.remove_task_core(task))
-                    else:
-                        raise ValueError("cmd %s not recognized in %s" % (cmd, self))
+                # while not self.cmd_queue.empty():
+                #     cmd, task = self.cmd_queue.get()
+                #     # Send feedback using feedback_queue
+                #     if cmd == 'a':
+                #         self.feedback_queue.put(self.register_task_core(task))
+                #     elif cmd == 'r':
+                #         self.feedback_queue.put(self.remove_task_core(task))
+                #     else:
+                #         raise ValueError("cmd %s not recognized in %s" % (cmd, self))
                 self.do()
                 diff = time.time() - self._last_loop_time
                 sleep_time = self._default_interval - diff
-                try:
-                    time.sleep(sleep_time)
-                except:
+                if sleep_time <= 0.0:
                     logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
+                else:
+                    # Process Command Queue in idle time
+                    idle_start = time.time()
+                    while True:
+                        remaining_time = idle_start + sleep_time - time.time()
+                        if remaining_time < 0:
+                            break
+                        try:
+                            cmd, task = self.cmd_queue.get(block=True, timeout=remaining_time)
+                            if cmd == 'a':
+                                self.feedback_queue.put(self.register_task_core(task))
+                            elif cmd == 'r':
+                                self.feedback_queue.put(self.remove_task_core(task))
+                            else:
+                                raise ValueError("cmd %s not recognized in %s" % (cmd, self))
+                        except Empty:
+                            break
+
                 self._last_loop_time = time.time()
 
             while not self.feedback_queue.empty():
