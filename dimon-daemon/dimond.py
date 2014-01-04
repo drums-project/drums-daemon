@@ -290,10 +290,21 @@ class DimonDaemon(object):
 
     # Data is not fine-grained per filter
     def _callback_sock(self, sock, data):
-        d = {'src': self.hostname,'type': 'socket', 'key' : 'socket', 'data' : data}
-        d_packed = msgpack.dumps(d)
-        self.cache_socket.put('socket', 'socket', d_packed)
-        self.__send_data_filtered(d, d_packed)
+        try:
+            timestamp = data['timestamp']
+            for proto in ['tcp', 'udp']:
+                for port, bytes in data[proto].items():
+                    tmp_data = dict()
+                    tmp_data['timestamp'] = timestamp
+                    tmp_data['bytes'] = bytes
+                    tmp_key = "%s:%s" % (proto, port)
+                    d = {'src': self.hostname, 'type': 'socket', 'key' : tmp_key, 'data' : tmp_data}
+                    d_packed = msgpack.dumps(d)
+                    self.cache_socket.put('socket', tmp_key, d_packed)
+                    self.__send_data_filtered(d, d_packed)
+        except KeyError as e:
+            logging.error("Key not found, this should not happen. (%s)", e)
+            raise
 
     # These are called in Bottle thread's context
     def add_filter(self, kind, key, key_path):
@@ -408,8 +419,8 @@ class DimonDaemon(object):
     def remove_filter_socket(self, key_path):
         return self.add_filter('socket', 'socket', key_path)
 
-    def get_socket(self, key_path = None):
-        d = self.cache_socket.get('socket', 'socket', key_path)
+    def get_socket(self, proto, port, key_path = None):
+        d = self.cache_socket.get('socket', "%s:%s" % (proto, port), key_path)
         if d:
             return d
         else:
@@ -448,6 +459,7 @@ if __name__ == "__main__":
 
     path_socket_base = rp + "/%s/socket"
     path_socket_monitor = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
+    path_socket_get = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
     #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
 
     logging.info("Starting dimon-daemon.")
@@ -480,10 +492,10 @@ if __name__ == "__main__":
 
     bottle.route(path_socket_monitor, "POST", app.add_socket)
     bottle.route(path_socket_monitor, "DELETE", app.remove_socket)
-    bottle.route(path_socket_base % 'monitor', "GET", app.get_socket)
-    bottle.route((path_socket_base % 'monitor') + "/<key_path:path>", "GET", app.get_socket)
-    bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "POST", app.add_filter_socket)
-    bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_socket)
+    bottle.route(path_socket_get, "GET", app.get_socket)
+    bottle.route(path_socket_get + "/<key_path:path>", "GET", app.get_socket)
+    #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "POST", app.add_filter_socket)
+    #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_socket)
 
     bottle.route(rp + '/filter', "GET", app.get_filters)
     bottle.route(rp + '/filter', "DELETE", app.remove_filters)
