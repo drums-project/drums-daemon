@@ -6,7 +6,6 @@ Process monitoring daemon
 
 from _common import *
 import psutil
-
 # TODO: Filter out input pids for positive integers only
 
 
@@ -74,16 +73,16 @@ class ProcessMonitor(TaskBase):
                     # to encode/decode a nested class (used by psutils)
                     # this code converts namedtuples to dict
                     data[pid][f] = psutil_convert(dummy)
+                    data[pid]['timestamp'] = time.time()
 
-                if data:
-                    try:
-                        data[pid]['timestamp'] = time.time()
-                        self.result_queue.put(data)
-                    except Queue.Full:
-                        logging.error("[in %s] Output queue is full in"
-                            % (self, ))
-                    finally:
-                        pass
+            if data:
+                try:
+                    self.result_queue.put(data)
+                except Queue.Full:
+                    logging.error("[in %s] Output queue is full in"
+                        % (self, ))
+                    #finally:
+                    #    pass
         except AttributeError:
            logging.warning("Exception: [in %s] Attribute `%s` not found."
                             % (self, f))

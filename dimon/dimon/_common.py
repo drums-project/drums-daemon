@@ -35,7 +35,6 @@ class __dimon__error():
 
 DimonError = __dimon__error()
 
-# TODO: Refactor to Python < 2.7
 # TODO: Write test
 def namedtuple_to_dict(nt):
     return {name:getattr(nt, name) for name in nt._fields}
