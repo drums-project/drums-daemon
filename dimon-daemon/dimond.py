@@ -259,6 +259,9 @@ class DimonDaemon(object):
                 return True
 
     def _extract_meta(self):
+        if not bottle.request.json:
+            # No JSON header at all
+            return ''
         try:
             meta = bottle.request.json['meta']
         except KeyError:
