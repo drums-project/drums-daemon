@@ -309,7 +309,7 @@ class DimonDaemon(object):
 
     # sock is "proto:port"
     def _callback_sock(self, sock, data):
-        d = {'src': self.hostname, 'type': 'sock', 'key': sock, 'data': data}
+        d = {'src': self.hostname, 'type': 'socket', 'key': sock, 'data': data}
         d_packed = msgpack.dumps(d)
         self.cache_socket.put('socket', sock, d_packed)
         self.__send_data_filtered(d, d_packed)
