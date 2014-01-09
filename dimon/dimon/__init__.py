@@ -71,11 +71,11 @@ class Dimon():
             self.host = HostMonitor(self.q, self.host_interval,
              "dimon_hostmonitor", self.host_fields)
             self.host.start()
-    def _create_socket_monitor(self):
+    def _create_socket_monitor(self, inet="any"):
         if self.sock == None:
             logging.debug("Creating a SocketMonitor object")
             self.sock = SocketMonitor(self.q, self.socket_interval,
-             self.socket_inet, "dimon_socketmonitor")
+             inet, "dimon_socketmonitor")
             self.sock.start()
 
     def _create_new_latency_monitor(self, target):
@@ -125,45 +125,58 @@ class Dimon():
         for target, late in self.late.items():
             late.set_options(pings_per_interval, wait_between_pings)
 
-    def monitor_pid(self, pid, callback):
+    def monitor_pid(self, pid, callback, meta=''):
         self._create_proc_monitor()
-        res = self.proc.register_task(pid)
+        res = self.proc.register_task(pid, meta)
         if res == DimonError.SUCCESS:
             with self.lock:
                 self.callback_map[pid] = callback
         return res
 
-    def monitor_host(self, callback):
+    def monitor_host(self, callback, meta=''):
         self._create_host_monitor()
         # TODO: Change 'host' to variable key
-        res = self.host.register_task('host')
+        res = self.host.register_task('host', meta)
         if res == DimonError.SUCCESS:
             with self.lock:
                 self.callback_map['host'] = callback
         return res
 
-    def create_monitor_socket(self, callback, inet = "any"):
-        if not self.sock:
-            self.socket_inet = inet
-            self._create_socket_monitor()
-            with self.lock:
-                self.callback_map['sock'] = callback
-        return DimonError.SUCCESS
+    #def create_monitor_socket(self, callback, inet="any"):
+    #    if not self.sock:
+    #        self.socket_inet = inet
+    #        self._create_socket_monitor()
+    #        with self.lock:
+    #            self.callback_map['sock'] = callback
+    #    return DimonError.SUCCESS
 
-    def add_socket_to_monitor(self, sock):
+    # def add_socket_to_monitor(self, sock):
+    #     """
+    #     sock: tuple("tcp/udp", "src/dst/''", port number)
+    #     """
+    #     if self.sock == None:
+    #         raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
+    #         return DimonError.RUNTIME
+
+    #     return self.sock.register_task(sock)
+
+    def monitor_sock(self, sock, callback, meta=''):
         """
         sock: tuple("tcp/udp", "src/dst/''", port number)
         """
-        if self.sock == None:
-            raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
-            return DimonError.RUNTIME
+        #self.socket_inet = inet
+        self._create_socket_monitor()
+        res = self.sock.register_task(sock, meta)
+        if res == DimonError.SUCCESS:
+            with self.lock:
+                proto, direction, port = sock
+                self.callback_map["%s:%s" % (proto, port)] = callback
+        return res
 
-        return self.sock.register_task(sock)
-
-    def monitor_target_latency(self, target, callback):
+    def monitor_target_latency(self, target, callback, meta=''):
         if self._create_new_latency_monitor(target):
             self.late[target].start()
-            res = self.late[target].register_task(target)
+            res = self.late[target].register_task(target, meta)
             if (res == DimonError.SUCCESS):
                 with self.lock:
                     self.callback_map[target] = callback

@@ -65,6 +65,10 @@ class SocketMonitor(TaskBase):
         self.data['tcp'] = dict()
         self.data['udp'] = dict()
 
+        self.meta = dict()
+        self.meta['tcp'] = dict()
+        self.meta['udp'] = dict()
+
     def update_filters(self):
         filters = ["(%s)" % (f,) for f in self.task_map.keys()]
         self.filter_str = " or ".join(filters)
@@ -75,7 +79,8 @@ class SocketMonitor(TaskBase):
 
     def register_task_core(self, task, meta=''):
         proto, direction, port, filter_str = tasktuple_to_filterstr(task)
-        self.task_map[filter_str] = (True, meta)
+        self.task_map[filter_str] = True
+        self.meta[proto][str(port)] = meta
         self.data[proto][str(port)] = 0
         self.update_filters()
         return DimonError.SUCCESS
@@ -85,6 +90,7 @@ class SocketMonitor(TaskBase):
             proto, direction, port, filter_str = tasktuple_to_filterstr(task)
             del self.task_map[filter_str]
             del self.data[proto][str(port)]
+            del self.meta[proto][str(port)]
             self.update_filters()
             return DimonError.SUCCESS
         except KeyError:
@@ -124,14 +130,20 @@ class SocketMonitor(TaskBase):
         self.packets_per_callback = 0
         # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
-        self.data['__ppc__'] = self.packets_per_callback
-        self.data['timestamp'] = time.time()
 
         _data = dict()
-        _data['sock'] = self.data
+        #_data['__ppc__'] = self.packets_per_callback
+        timestamp = time.time()
+        #_data = dict()
+        #_data['sock'] = self.data
+        #_data['meta'] = self.meta
         #pprint(_data)
         # TODO: The first packet should be sent (0, 0, ...)
         if self.packets_per_callback > 0:
+            for proto in ['tcp', 'udp']:
+                for port, bytes in self.data[proto].items():
+                    _key = "%s:%s" % (proto, port)
+                    _data[_key] = {'timestamp': timestamp, 'bytes': bytes, 'meta': self.meta[proto][port]}
             try:
                 self.result_queue.put(_data)
             except Full:

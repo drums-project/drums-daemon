@@ -74,6 +74,7 @@ class ProcessMonitor(TaskBase):
                     # this code converts namedtuples to dict
                     data[pid][f] = psutil_convert(dummy)
                     data[pid]['timestamp'] = time.time()
+                    data[pid]['meta'] = meta
 
             if data:
                 try:

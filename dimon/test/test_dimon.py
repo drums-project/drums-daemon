@@ -22,8 +22,8 @@ class BasicTask(TaskBase):
     def __init__(self, result_queue, default_interval):
         TaskBase.__init__(self, result_queue, default_interval)
 
-    def register_task_core(self, task):
-        self.task_map[task] = 0
+    def register_task_core(self, task, meta=''):
+        self.task_map[task] = (0, meta)
         return DimonError.SUCCESS
 
     def remove_task_core(self, task):
@@ -37,7 +37,7 @@ class BasicTask(TaskBase):
         if self.task_map:
             sys.stdout.write('>')
             sys.stdout.flush()
-            self.task_map = {key:val+1 for key,val in self.task_map.items()}
+            self.task_map = {key:(val+1, meta) for key,(val, meta) in self.task_map.items()}
             #if self.result_queue.empty():
             #pprint(self.task_map)
             self.result_queue.put(self.task_map)
@@ -45,21 +45,24 @@ class BasicTask(TaskBase):
 class TaskBaseTest(unittest.TestCase):
     def test_basic_task_loop(self):
         q = Queue()
+        meta = 'dummytask'
         task = BasicTask(q, 0.1)
         task.start()
-        task.register_task('t1')
+        self.assertEqual(task.register_task('t1', meta), DimonError.SUCCESS)
         try:
             time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 1)
-            task.register_task('t2')
+            self.assertEqual(task.register_task('t2'), DimonError.SUCCESS)
             time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 2)
             time.sleep(0.5)
             d = q.get(); task.flush_result_queue()
-            self.assertGreater(d['t1'], 0)
-            self.assertGreater(d['t2'], 0)
+            self.assertGreater(d['t1'][0], 0)
+            self.assertGreater(d['t2'][0], 0)
+            self.assertEquals(d['t1'][1], meta)
+            self.assertEquals(d['t2'][1], '')
             task.remove_task('t2')
             time.sleep(0.1)
             task.flush_result_queue()
@@ -76,9 +79,9 @@ class ProcessTaskTest(unittest.TestCase):
         q = Queue()
         task = ProcessMonitor(q, 0.1)
         task.start()
-
+        meta = 'myself'
         pid = os.getpid()
-        task.register_task(pid)
+        self.assertEquals(task.register_task(pid, meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -88,9 +91,11 @@ class ProcessTaskTest(unittest.TestCase):
             threads = d[pid]['get_threads']
             mem = d[pid]['get_memory_info']['rss']
             name = d[pid]['name']
+            getmeta = d[pid]['meta']
             self.assertGreater(len(threads), 0, "Testing number of threads")
             self.assertGreater(mem, 0, "Testing memory")
             self.assertEqual(name, "python", "Testing app name")
+            self.assertEqual(meta, getmeta)
             task.remove_task(pid)
             task.flush_result_queue()
             time.sleep(0.1)
@@ -113,7 +118,8 @@ class HostTaskTest(unittest.TestCase):
         q = Queue()
         task = HostMonitor(q, 0.1)
         task.start()
-        task.register_task(None)
+        meta = 'hostishu'
+        self.assertEquals(task.register_task(None, meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -125,6 +131,7 @@ class HostTaskTest(unittest.TestCase):
             vm = d['host']['virtual_memory']
             self.assertGreater(len(net_count), 0, "net_io_counter type test")
             self.assertGreater(vm['active'], 0)
+            self.assertEquals(d['host']['meta'], meta)
             task.remove_task('host')
             task.flush_result_queue()
             time.sleep(0.25)
@@ -179,8 +186,10 @@ class SocketTaskTest(unittest.TestCase):
 
         t1 = ("tcp", "dst", "3333")
         t2 = ("udp", "dst", "4444")
-        task.register_task(t2)
-        task.register_task(t1)
+        meta1 = {'name': 'netcat-tcp'}
+        meta2 = {'dummy': 100}
+        self.assertEquals(task.register_task(t2, meta2), DimonError.SUCCESS)
+        self.assertEquals(task.register_task(t1, meta1), DimonError.SUCCESS)
         # Wait some time until all packets get captured,
         # threaded mode needs more time
         #task.flush_result_queue()
@@ -193,11 +202,11 @@ class SocketTaskTest(unittest.TestCase):
             time.sleep(0.5)
             d = q.get()
             pprint(d)
-            byte_count = d['sock']['tcp']['3333']
+            byte_count = d['tcp:3333']['bytes']
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
-            byte_count = d['sock']['udp']['4444']
+            byte_count = d['udp:4444']['bytes']
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
@@ -229,7 +238,8 @@ class LatencyTaskTest(unittest.TestCase):
         task = LatencyMonitor(q, 1, 5, 0.1)
         task.start()
 
-        task.register_task("127.0.0.1")
+        meta = "to-localhost"
+        self.assertEquals(task.register_task("127.0.0.1", meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -237,6 +247,7 @@ class LatencyTaskTest(unittest.TestCase):
             except Empty:
                 self.fail("Socket monitor did not report anything in 5 seconds")
             data = d['127.0.0.1']
+            self.assertEqual(data['meta'], meta)
             self.assertEqual(data['error'], None)
             self.assertGreater(data['avg'], 0)
             self.assertGreater(data['min'], 0)
@@ -291,6 +302,9 @@ class DimonTest(unittest.TestCase):
 
 
     def test_dimon_callback(self):
+        def _sr(s):
+            return s[::-1]
+
         def callback(pid, data):
             self.flag += 1
             self.assertEqual(pid, self.pid)
@@ -304,27 +318,33 @@ class DimonTest(unittest.TestCase):
         def callback_another(pid, data):
             self.flag_another += 1
             self.assertEqual(pid, self.pid_another)
+            self.assertEquals(_sr(str(pid)), data['meta'])
 
         def callback_host(host, data):
             self.flag_host += 1
             self.assertGreater(data['swap_memory']['free'], 0)
+            self.assertEquals(_sr(host), data['meta'])
 
         def callback_sock(sock, data):
             self.flag_sock += 1
-            self.assertGreater(data['tcp']['3333'], 0)
+            self.assertGreater(data['tcp:3333']['bytes'], 0)
+            self.assertEquals(_sr(sock), data['meta'])
 
         def callback_late(target, data):
             self.flag_late += 1
             self.assertNotEqual(data['error'], data['avg'])
+            self.assertEquals(_sr(target), data['meta'])
 
 
-        self.d.monitor_pid(self.pid, callback)
-        self.d.monitor_pid(self.pid_another, callback_another)
-        self.d.monitor_host(callback_host)
-        self.d.create_monitor_socket(callback_sock)
-        self.d.add_socket_to_monitor(('tcp', 'dst', '3333'))
-        self.d.monitor_target_latency('localhost', callback_late)
-        self.d.monitor_target_latency('google.co.jp', callback_late)
+        # The _sr is used to reverse the key before sending that as meta
+        # This equality will be checked in callbacks to test if meta
+        # is being transmitted back OK.
+        self.d.monitor_pid(self.pid, callback, _sr(str(self.pid))) # Reverse
+        self.d.monitor_pid(self.pid_another, callback_another, _sr(str(self.pid_another)))
+        self.d.monitor_host(callback_host, _sr('host'))
+        self.d.monitor_sock(('tcp', 'dst', '3333'), callback_sock, _sr('tcp:3333'))
+        self.d.monitor_target_latency('localhost', callback_late, _sr('localhost'))
+        self.d.monitor_target_latency('google.co.jp', callback_late, _sr('google.co.jp'))
         print "Spinning for 100 times ..."
         for i in range(100):
             self.d.spin_once()

@@ -96,7 +96,7 @@ class TaskBase(Thread):
             self.cmd_queue.put(('a', task, meta))
             # Wait 5 seconds for the feeback
             try:
-                return self.feedback_queue.get(block = True, timeout = 5)
+                return self.feedback_queue.get(block=True, timeout=5)
             except Empty:
                 return DimonError.TIMEOUT
         except Full:
@@ -107,7 +107,7 @@ class TaskBase(Thread):
             self.cmd_queue.put(('r', task, ''))
             try:
                 # Wait 5 seconds for the feeback
-                return self.feedback_queue.get(block = True, timeout = 5)
+                return self.feedback_queue.get(block=True, timeout=5)
             except Empty:
                 return DimonError.TIMEOUT
         except Full:
