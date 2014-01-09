@@ -28,7 +28,8 @@ class LatencyMonitor(TaskBase):
         self.pings_per_interval = pings_per_interval
         self.wait_between_pings = wait_between_pings
 
-    def register_task_core(self, task, meta=None):
+    def register_task_core(self, task, meta=''):
+        assert isinstance(meta, basestring)
         self.target = (task, meta)
         return DimonError.SUCCESS
 

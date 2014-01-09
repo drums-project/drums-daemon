@@ -28,6 +28,7 @@ class ProcessMonitor(TaskBase):
         """
         Adds a pid to the task_map
         """
+        assert isinstance(meta, basestring)
         try:
             logging.debug("Registering pid: %s" % (task,))
             self.task_map[task] = (psutil.Process(task), meta)

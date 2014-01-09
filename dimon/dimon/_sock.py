@@ -78,10 +78,16 @@ class SocketMonitor(TaskBase):
 
 
     def register_task_core(self, task, meta=''):
+        assert isinstance(meta, basestring)
         proto, direction, port, filter_str = tasktuple_to_filterstr(task)
+        port = str(port)
         self.task_map[filter_str] = True
-        self.meta[proto][str(port)] = meta
-        self.data[proto][str(port)] = 0
+        if not port in self.meta[proto]:
+            self.meta[proto][port] = list()
+            self.data[proto][port] = 0
+
+        if meta:
+            self.meta[proto][port].append(meta)
         self.update_filters()
         return DimonError.SUCCESS
 

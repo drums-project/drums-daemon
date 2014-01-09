@@ -37,8 +37,9 @@ class HostMonitor(TaskBase):
 
     def register_task_core(self, task, meta=''):
         """
-        Adds a pid to the task_map
+        add current host to task_map
         """
+        assert isinstance(meta, basestring)
         logging.debug("Registering host")
         self.task_map['host'] = (psutil, meta)
         return DimonError.SUCCESS

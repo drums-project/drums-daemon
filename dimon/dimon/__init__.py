@@ -160,7 +160,7 @@ class Dimon():
 
     #     return self.sock.register_task(sock)
 
-    def monitor_sock(self, sock, callback, meta=''):
+    def monitor_socket(self, sock, callback, meta=''):
         """
         sock: tuple("tcp/udp", "src/dst/''", port number)
         """

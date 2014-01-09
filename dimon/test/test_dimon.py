@@ -61,8 +61,8 @@ class TaskBaseTest(unittest.TestCase):
             d = q.get(); task.flush_result_queue()
             self.assertGreater(d['t1'][0], 0)
             self.assertGreater(d['t2'][0], 0)
-            self.assertEquals(d['t1'][1], meta)
-            self.assertEquals(d['t2'][1], '')
+            self.assertEqual(d['t1'][1], meta)
+            self.assertEqual(d['t2'][1], '')
             task.remove_task('t2')
             time.sleep(0.1)
             task.flush_result_queue()
@@ -81,7 +81,7 @@ class ProcessTaskTest(unittest.TestCase):
         task.start()
         meta = 'myself'
         pid = os.getpid()
-        self.assertEquals(task.register_task(pid, meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(pid, meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -119,7 +119,7 @@ class HostTaskTest(unittest.TestCase):
         task = HostMonitor(q, 0.1)
         task.start()
         meta = 'hostishu'
-        self.assertEquals(task.register_task(None, meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(None, meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -131,7 +131,7 @@ class HostTaskTest(unittest.TestCase):
             vm = d['host']['virtual_memory']
             self.assertGreater(len(net_count), 0, "net_io_counter type test")
             self.assertGreater(vm['active'], 0)
-            self.assertEquals(d['host']['meta'], meta)
+            self.assertEqual(d['host']['meta'], meta)
             task.remove_task('host')
             task.flush_result_queue()
             time.sleep(0.25)
@@ -186,10 +186,10 @@ class SocketTaskTest(unittest.TestCase):
 
         t1 = ("tcp", "dst", "3333")
         t2 = ("udp", "dst", "4444")
-        meta1 = {'name': 'netcat-tcp'}
-        meta2 = {'dummy': 100}
-        self.assertEquals(task.register_task(t2, meta2), DimonError.SUCCESS)
-        self.assertEquals(task.register_task(t1, meta1), DimonError.SUCCESS)
+        meta1 = 'netcat'
+        meta2 = 'dummy'
+        self.assertEqual(task.register_task(t2, meta2), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(t1, meta1), DimonError.SUCCESS)
         # Wait some time until all packets get captured,
         # threaded mode needs more time
         #task.flush_result_queue()
@@ -210,6 +210,8 @@ class SocketTaskTest(unittest.TestCase):
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
+            self.assertEqual(d['tcp:3333']['meta'][0], meta1)
+            self.assertEqual(d['udp:4444']['meta'][0], meta2)
             task.remove_task(t1)
             task.remove_task(t2)
             task.flush_result_queue()
@@ -239,7 +241,7 @@ class LatencyTaskTest(unittest.TestCase):
         task.start()
 
         meta = "to-localhost"
-        self.assertEquals(task.register_task("127.0.0.1", meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task("127.0.0.1", meta), DimonError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -274,6 +276,13 @@ class LatencyTaskTest(unittest.TestCase):
             task.set_terminate_event()
             task.join()
 
+
+def _sr(s):
+    """
+    reverse a string
+    """
+    return s[::-1]
+
 from dimon import Dimon
 class DimonTest(unittest.TestCase):
     def setUp(self):
@@ -301,50 +310,46 @@ class DimonTest(unittest.TestCase):
         self.d = Dimon(process_interval = 0.1, host_interval = 0.5, socket_interval = 0.2, late_interval = 1, late_pings_per_interval = 5, late_wait_between_pings = 0.05)
 
 
+    def callback(self, pid, data):
+        self.flag += 1
+        self.assertEqual(pid, self.pid)
+        threads = data['get_threads']
+        mem = data['get_memory_info']['rss']
+        name = data['name']
+        self.assertGreater(len(threads), 0, "Testing number of threads")
+        self.assertGreater(mem, 0, "Testing memory")
+        self.assertEqual(name, "python", "Testing app name")
+
+    def callback_another(self, pid, data):
+        self.flag_another += 1
+        self.assertEqual(pid, self.pid_another)
+        self.assertEqual(_sr(str(pid)), data['meta'])
+
+    def callback_host(self, host, data):
+        self.flag_host += 1
+        self.assertGreater(data['swap_memory']['free'], 0)
+        self.assertEqual(_sr(host), data['meta'])
+
+    def callback_sock(self, sock, data):
+        self.flag_sock += 1
+        self.assertGreater(data['bytes'], 0)
+        self.assertEqual(_sr(sock), data['meta'][0])
+
+    def callback_late(self, target, data):
+        self.flag_late += 1
+        self.assertNotEqual(data['error'], data['avg'])
+        self.assertEqual(_sr(target), data['meta'])
+
     def test_dimon_callback(self):
-        def _sr(s):
-            return s[::-1]
-
-        def callback(pid, data):
-            self.flag += 1
-            self.assertEqual(pid, self.pid)
-            threads = data['get_threads']
-            mem = data['get_memory_info']['rss']
-            name = data['name']
-            self.assertGreater(len(threads), 0, "Testing number of threads")
-            self.assertGreater(mem, 0, "Testing memory")
-            self.assertEqual(name, "python", "Testing app name")
-
-        def callback_another(pid, data):
-            self.flag_another += 1
-            self.assertEqual(pid, self.pid_another)
-            self.assertEquals(_sr(str(pid)), data['meta'])
-
-        def callback_host(host, data):
-            self.flag_host += 1
-            self.assertGreater(data['swap_memory']['free'], 0)
-            self.assertEquals(_sr(host), data['meta'])
-
-        def callback_sock(sock, data):
-            self.flag_sock += 1
-            self.assertGreater(data['tcp:3333']['bytes'], 0)
-            self.assertEquals(_sr(sock), data['meta'])
-
-        def callback_late(target, data):
-            self.flag_late += 1
-            self.assertNotEqual(data['error'], data['avg'])
-            self.assertEquals(_sr(target), data['meta'])
-
-
         # The _sr is used to reverse the key before sending that as meta
         # This equality will be checked in callbacks to test if meta
         # is being transmitted back OK.
-        self.d.monitor_pid(self.pid, callback, _sr(str(self.pid))) # Reverse
-        self.d.monitor_pid(self.pid_another, callback_another, _sr(str(self.pid_another)))
-        self.d.monitor_host(callback_host, _sr('host'))
-        self.d.monitor_sock(('tcp', 'dst', '3333'), callback_sock, _sr('tcp:3333'))
-        self.d.monitor_target_latency('localhost', callback_late, _sr('localhost'))
-        self.d.monitor_target_latency('google.co.jp', callback_late, _sr('google.co.jp'))
+        self.d.monitor_pid(self.pid, self.callback, _sr(str(self.pid))) # Reverse
+        self.d.monitor_pid(self.pid_another, self.callback_another, _sr(str(self.pid_another)))
+        self.d.monitor_host(self.callback_host, _sr('host'))
+        self.d.monitor_socket(('tcp', 'dst', '3333'), self.callback_sock, _sr('tcp:3333'))
+        self.d.monitor_target_latency('localhost', self.callback_late, _sr('localhost'))
+        self.d.monitor_target_latency('google.co.jp', self.callback_late, _sr('google.co.jp'))
         print "Spinning for 100 times ..."
         for i in range(100):
             self.d.spin_once()
