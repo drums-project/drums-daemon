@@ -35,12 +35,12 @@ class HostMonitor(TaskBase):
                 self.fields.remove('net_io_counters')
                 self.fields.append('network_io_counters')
 
-    def register_task_core(self, task):
+    def register_task_core(self, task, meta=''):
         """
         Adds a pid to the task_map
         """
         logging.debug("Registering host")
-        self.task_map['host'] = psutil
+        self.task_map['host'] = (psutil, meta)
         return DimonError.SUCCESS
 
 
@@ -99,6 +99,7 @@ class HostMonitor(TaskBase):
         if data:
             try:
                 data['host']['timestamp'] = time.time()
+                data['host']['meta'] = self.task_map['host'][1]
                 self.result_queue.put(data)
             except Queue.Full:
                 logging.error("[in %s] Output queue is full in"

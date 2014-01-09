@@ -28,8 +28,8 @@ class LatencyMonitor(TaskBase):
         self.pings_per_interval = pings_per_interval
         self.wait_between_pings = wait_between_pings
 
-    def register_task_core(self, task):
-        self.target = task
+    def register_task_core(self, task, meta=''):
+        self.target = (task, meta)
         return DimonError.SUCCESS
 
     def remove_task_core(self, task):
@@ -51,7 +51,7 @@ class LatencyMonitor(TaskBase):
         for i in xrange(self.pings_per_interval):
             sent += 1
             try:
-                delay = do_one(self.target, timeout = 2, psize = 64)
+                delay = do_one(self.target[0], timeout = 2, psize = 64)
                 success += 1
             except socket.error, msg:
                 err = msg[0]
@@ -76,6 +76,7 @@ class LatencyMonitor(TaskBase):
         dummy['min'] = mnrtt
         dummy['error'] = err
         dummy['timestamp'] = time.time()
+        dummy['meta'] = self.target[1]
         data = dict()
         data[self.target] = dummy
 

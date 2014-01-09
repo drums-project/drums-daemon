@@ -91,9 +91,9 @@ class TaskBase(Thread):
     def set_terminate_event(self):
         self._terminate_event.set()
 
-    def register_task(self, task):
+    def register_task(self, task, meta=''):
         try:
-            self.cmd_queue.put(('a', task))
+            self.cmd_queue.put(('a', task, meta))
             # Wait 5 seconds for the feeback
             try:
                 return self.feedback_queue.get(block = True, timeout = 5)
@@ -104,7 +104,7 @@ class TaskBase(Thread):
 
     def remove_task(self, task):
         try:
-            self.cmd_queue.put(('r', task))
+            self.cmd_queue.put(('r', task, ''))
             try:
                 # Wait 5 seconds for the feeback
                 return self.feedback_queue.get(block = True, timeout = 5)
@@ -112,6 +112,12 @@ class TaskBase(Thread):
                 return DimonError.TIMEOUT
         except Full:
             logging.error("Queue is full %s", self)
+
+    def register_task_core(self, task, meta=''):
+        raise NotImplementedError
+
+    def remove_task_core(self, task):
+        raise NotImplementedError
 
     def run(self):
         """
@@ -143,9 +149,9 @@ class TaskBase(Thread):
                         if remaining_time < 0:
                             break
                         try:
-                            cmd, task = self.cmd_queue.get(block=True, timeout=remaining_time)
+                            cmd, task, meta = self.cmd_queue.get(block=True, timeout=remaining_time)
                             if cmd == 'a':
-                                self.feedback_queue.put(self.register_task_core(task))
+                                self.feedback_queue.put(self.register_task_core(task, meta))
                             elif cmd == 'r':
                                 self.feedback_queue.put(self.remove_task_core(task))
                             else:

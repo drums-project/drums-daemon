@@ -24,13 +24,13 @@ class ProcessMonitor(TaskBase):
         else:
             self.fields = ['name', 'status', 'get_cpu_percent', 'get_cpu_times','get_memory_info', 'get_io_counters', 'get_threads', 'cmdline']
 
-    def register_task_core(self, task):
+    def register_task_core(self, task, meta=''):
         """
         Adds a pid to the task_map
         """
         try:
             logging.debug("Registering pid: %s" % (task,))
-            self.task_map[task] = psutil.Process(task)
+            self.task_map[task] = (psutil.Process(task), meta)
             return DimonError.SUCCESS
         except psutil.NoSuchProcess:
             logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
@@ -53,7 +53,7 @@ class ProcessMonitor(TaskBase):
     def do(self):
         data = dict()
         try:
-            for pid, proc in self.task_map.items():
+            for pid, (proc, meta) in self.task_map.items():
                 data[pid] = dict()
                 for f in self.fields:
                     attr = getattr(proc, f, None)
@@ -83,6 +83,7 @@ class ProcessMonitor(TaskBase):
                         % (self, ))
                     #finally:
                     #    pass
+
         except AttributeError:
            logging.warning("Exception: [in %s] Attribute `%s` not found."
                             % (self, f))
