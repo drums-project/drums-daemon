@@ -31,7 +31,7 @@ setup(
     packages = [],
     url = 'TODO',
     license = 'LICENSE',
-    install_requires = ['bottle', 'dimon', 'pyzmq >= 2.2', 'msgpack-python'],
+    install_requires = ['bottle >= 0.10', 'dimon', 'pyzmq >= 2.2', 'msgpack-python'],
     description = 'TODO',
     scripts = ["dimond.py"],
     test_suite = 'test.test_dimond.get_suite'

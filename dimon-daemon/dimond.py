@@ -258,6 +258,22 @@ class DimonDaemon(object):
                 self.dimon.shutdown()
                 return True
 
+    def _extract_meta(self):
+        try:
+            meta = bottle.request.json['meta']
+        except KeyError:
+            logging.error("Request is JSON but `meta` key is not present.")
+            meta = ''
+        except ValueError:
+            logging.error("Request is not vailid JSON.")
+            meta = ''
+
+        if not isinstance(meta, basestring):
+            logging.error("Request is JSON, but the value for `meta` can only be string")
+            meta = ''
+
+        return meta
+
     def __send_data_filtered(self, d, d_packed):
         d_filtered = self.data_filter.apply(d)
         msg_key = "%s:%s:%s" % (d['src'], d['type'], d['key'])
@@ -288,23 +304,12 @@ class DimonDaemon(object):
         self.cache_latency.put('latency', target, d_packed)
         self.__send_data_filtered(d, d_packed)
 
-    # Data is not fine-grained per filter
+    # sock is "proto:port"
     def _callback_sock(self, sock, data):
-        try:
-            timestamp = data['timestamp']
-            for proto in ['tcp', 'udp']:
-                for port, bytes in data[proto].items():
-                    tmp_data = dict()
-                    tmp_data['timestamp'] = timestamp
-                    tmp_data['bytes'] = bytes
-                    tmp_key = "%s:%s" % (proto, port)
-                    d = {'src': self.hostname, 'type': 'socket', 'key' : tmp_key, 'data' : tmp_data}
-                    d_packed = msgpack.dumps(d)
-                    self.cache_socket.put('socket', tmp_key, d_packed)
-                    self.__send_data_filtered(d, d_packed)
-        except KeyError as e:
-            logging.error("Key not found, this should not happen. (%s)", e)
-            raise
+        d = {'src': self.hostname, 'type': 'sock', 'key': sock, 'data': data}
+        d_packed = msgpack.dumps(d)
+        self.cache_socket.put('socket', sock, d_packed)
+        self.__send_data_filtered(d, d_packed)
 
     # These are called in Bottle thread's context
     def add_filter(self, kind, key, key_path):
@@ -326,7 +331,7 @@ class DimonDaemon(object):
 
     def add_pid(self, pid):
         # Cache entry will be created automatically on first callback call
-        http_response(self.dimon.monitor_pid(pid, self._callback_pid))
+        http_response(self.dimon.monitor_pid(pid, self._callback_pid, self._extract_meta()))
 
     def remove_pid(self, pid):
         # Cache entry should manually be removed
@@ -347,7 +352,7 @@ class DimonDaemon(object):
             http_response(DimonError.NOTFOUND)
 
     def enable_host(self):
-        http_response(self.dimon.monitor_host(self._callback_host))
+        http_response(self.dimon.monitor_host(self._callback_host, self._extract_meta()))
 
     def disable_host(self):
         http_response(self.dimon.remove_host())
@@ -367,7 +372,7 @@ class DimonDaemon(object):
 
     def add_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
-            http_response(self.dimon.monitor_target_latency(target, self._callback_latency))
+            http_response(self.dimon.monitor_target_latency(target, self._callback_latency, self._extract_meta()))
         else:
             http_response(DimonError.NOTFOUND)
 
@@ -400,13 +405,19 @@ class DimonDaemon(object):
 
     def add_socket(self, proto, direction, port):
         # This will happen if necessary
-        res = self.dimon.create_monitor_socket(self._callback_sock)
-        if  res == DimonError.SUCCESS:
-            if direction == "bi":
-                direction = ""
-            http_response(self.dimon.add_socket_to_monitor((proto, direction, port)))
-        else:
-            http_response(res)
+        if direction == "bi":
+            direction = ""
+        http_response(self.dimon.monitor_socket((proto, direction, port), self._callback_sock, self._extract_meta()))
+
+
+
+        #res = self.dimon.create_monitor_socket(self._callback_sock)
+        #if  res == DimonError.SUCCESS:
+        #    if direction == "bi":
+        #        direction = ""
+        #    http_response(self.dimon.add_socket_to_monitor((proto, direction, port)))
+        #else:
+         #   http_response(res)
 
     def remove_socket(self, proto, direction, port):
         if direction == "bi":
