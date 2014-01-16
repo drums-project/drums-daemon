@@ -425,7 +425,7 @@ class DimonDaemon(object):
     def remove_socket(self, proto, direction, port):
         if direction == "bi":
                 direction = ""
-        http_response(self.dimon.remove_socket((proto, direction, port)))
+        http_response(self.dimon.remove_socket((proto, direction, port), self._extract_meta()))
 
     def add_filter_socket(self, key_path):
         return self.add_filter('socket', 'socket', key_path)
