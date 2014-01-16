@@ -83,21 +83,25 @@ class SocketMonitor(TaskBase):
         port = str(port)
         self.task_map[filter_str] = True
         if not port in self.meta[proto]:
-            self.meta[proto][port] = list()
+            self.meta[proto][port] = set()
             self.data[proto][port] = 0
 
         if meta:
-            self.meta[proto][port].append(meta)
+            self.meta[proto][port].add(meta)
         self.update_filters()
         return DimonError.SUCCESS
 
-    def remove_task_core(self, task):
+    def remove_task_core(self, task, meta=''):
         try:
             proto, direction, port, filter_str = tasktuple_to_filterstr(task)
-            del self.task_map[filter_str]
-            del self.data[proto][str(port)]
-            del self.meta[proto][str(port)]
-            self.update_filters()
+            # Empty meta will delete all data
+            if meta:
+                self.meta[proto][str(port)].remove(meta)
+            if not self.meta[proto][str(port)] or not meta:
+                del self.task_map[filter_str]
+                del self.data[proto][str(port)]
+                del self.meta[proto][str(port)]
+                self.update_filters()
             return DimonError.SUCCESS
         except KeyError:
             logging.error("Error removing socket filter: %s" % (task,))
@@ -149,7 +153,7 @@ class SocketMonitor(TaskBase):
             for proto in ['tcp', 'udp']:
                 for port, bytes in self.data[proto].items():
                     _key = "%s:%s" % (proto, port)
-                    _data[_key] = {'timestamp': timestamp, 'bytes': bytes, 'meta': self.meta[proto][port]}
+                    _data[_key] = {'timestamp': timestamp, 'bytes': bytes, 'meta': list(self.meta[proto][port])}
             try:
                 self.result_queue.put(_data)
             except Full:

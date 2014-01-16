@@ -223,12 +223,12 @@ class Dimon():
                 #    self.proc = None
         return res
 
-    def remove_socket(self, sock):
+    def remove_socket(self, sock, meta=''):
         if not self.sock:
             logging.error("Dimon SockMonitor has not been started yet.")
             return DimonError.NOTFOUND
         # TODO
-        return self.sock.remove_task(sock)
+        return self.sock.remove_task(sock, meta)
 
     def remove_target_latency(self, target):
         if target in self.late:

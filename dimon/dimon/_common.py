@@ -102,9 +102,9 @@ class TaskBase(Thread):
         except Full:
             logging.error("Queue is full %s", self)
 
-    def remove_task(self, task):
+    def remove_task(self, task, meta=''):
         try:
-            self.cmd_queue.put(('r', task, ''))
+            self.cmd_queue.put(('r', task, meta))
             try:
                 # Wait 5 seconds for the feeback
                 return self.feedback_queue.get(block=True, timeout=5)
@@ -153,7 +153,7 @@ class TaskBase(Thread):
                             if cmd == 'a':
                                 self.feedback_queue.put(self.register_task_core(task, meta))
                             elif cmd == 'r':
-                                self.feedback_queue.put(self.remove_task_core(task))
+                                self.feedback_queue.put(self.remove_task_core(task, meta))
                             else:
                                 raise ValueError("cmd %s not recognized in %s" % (cmd, self))
                         except Empty:

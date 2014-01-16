@@ -45,7 +45,7 @@ class HostMonitor(TaskBase):
         return DimonError.SUCCESS
 
 
-    def remove_task_core(self, task):
+    def remove_task_core(self, task, meta=''):
         try:
             del self.task_map['host']
             return DimonError.SUCCESS

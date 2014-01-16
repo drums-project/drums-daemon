@@ -33,7 +33,7 @@ class LatencyMonitor(TaskBase):
         self.target = (task, meta)
         return DimonError.SUCCESS
 
-    def remove_task_core(self, task):
+    def remove_task_core(self, task, meta=''):
         self.target = None
         return DimonError.SUCCESS
 

@@ -42,7 +42,7 @@ class ProcessMonitor(TaskBase):
                 % (self, task))
             return DimonError.ACCESSDENIED
 
-    def remove_task_core(self, task):
+    def remove_task_core(self, task, meta=''):
         try:
             del self.task_map[task]
             return DimonError.SUCCESS

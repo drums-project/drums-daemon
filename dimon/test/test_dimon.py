@@ -26,7 +26,7 @@ class BasicTask(TaskBase):
         self.task_map[task] = (0, meta)
         return DimonError.SUCCESS
 
-    def remove_task_core(self, task):
+    def remove_task_core(self, task, meta=''):
         try:
             del self.task_map[task]
             return DimonError.SUCCESS
@@ -210,6 +210,8 @@ class SocketTaskTest(unittest.TestCase):
             #print "Byte Count: %s" % byte_count
             self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
 
+            self.assertEquals(len(d['tcp:3333']['meta']), 1)
+            self.assertEquals(len(d['udp:4444']['meta']), 1)
             self.assertEqual(d['tcp:3333']['meta'][0], meta1)
             self.assertEqual(d['udp:4444']['meta'][0], meta2)
             task.remove_task(t1)
@@ -333,7 +335,7 @@ class DimonTest(unittest.TestCase):
     def callback_sock(self, sock, data):
         self.flag_sock += 1
         self.assertGreater(data['bytes'], 0)
-        self.assertEqual(_sr(sock), data['meta'][0])
+        self.assertEqual(_sr(sock) in data['meta'], True)
 
     def callback_late(self, target, data):
         self.flag_late += 1
