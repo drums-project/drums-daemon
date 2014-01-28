@@ -17,7 +17,7 @@ thread/process/coroutine though.
 """
 
 class LatencyMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, pings_per_interval, wait_between_pings = 0.1, name = ""):
+    def __init__(self, result_queue, default_interval, pings_per_interval, wait_between_pings = 0.1, name = "dimon_latencymonitor"):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.pings_per_interval = pings_per_interval
         self.target = None

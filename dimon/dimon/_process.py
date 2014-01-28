@@ -10,7 +10,7 @@ import psutil
 
 
 class ProcessMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "",
+    def __init__(self, result_queue, default_interval, name = "dimon_processmonitor",
         fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
