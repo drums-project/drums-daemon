@@ -65,7 +65,7 @@ class HostMonitor(TaskBase):
             attr = getattr(psutil, f, None)
             if callable(attr):
                 if f == "cpu_percent":
-                    dummy = attr(interval = 0, percpu = True)
+                    dummy = attr(interval = 0, percpu = False)
                 elif f == "cpu_times":
                     dummy = attr(percpu = False)
                 #elif f in ["disk_io_counters", "disk_usage"]:
