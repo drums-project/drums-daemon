@@ -9,7 +9,7 @@ import psutil
 from pprint import pprint
 
 class HostMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "", fields = [], pids = []):
+    def __init__(self, result_queue, default_interval, name = "dimon_hostmonitor", fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):

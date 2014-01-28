@@ -32,7 +32,7 @@ setup(
     packages = ['dimon'],
     url = 'TODO',
     license = 'LICENSE',
-    install_requires = ['pcapy', 'impacket', 'psutil >= 1.1'],
+    install_requires = ['pcapy', 'psutil >= 1.1', 'setproctitle'],
     description = 'TODO',
     test_suite = 'test.test_dimon.get_suite'
 )

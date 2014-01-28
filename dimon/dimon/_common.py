@@ -19,6 +19,7 @@ if concurrency_impl == 'multiprocessing':
     from multiprocessing import Process as Thread
     from multiprocessing import Queue, Event
     from Queue import Empty, Full
+    from setproctitle import setproctitle
 
 import sys
 import logging
@@ -55,7 +56,7 @@ def psutil_convert(data):
 
 # TODO: Merge these classes
 class TaskBase(Thread):
-    def __init__(self, result_queue, default_interval, name = ""):
+    def __init__(self, result_queue, default_interval, name="dimon_basetask"):
         Thread.__init__(self, target = None, name = name)
         assert default_interval > 0
         self._default_interval = default_interval
@@ -68,6 +69,13 @@ class TaskBase(Thread):
         self.cmd_queue = Queue()
         self.feedback_queue = Queue()
         self.daemon = True
+        self.name = name
+        try:
+            setproctitle(self.name)
+        except NameError:
+            logging.warn("setproctitle is not available.")
+            pass
+        logging.info("Initiated a new Task Request: %s" % (self.name,))
 
     def __repr__(self):
         name =  self.__class__.__name__
