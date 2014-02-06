@@ -152,6 +152,7 @@ class TaskBase(Thread):
                 else:
                     # Process Command Queue in idle time
                     idle_start = time.time()
+                    logging.info("[running time] %s, %.9f", self.name, diff)
                     while True:
                         remaining_time = idle_start + sleep_time - time.time()
                         if remaining_time < 0:
