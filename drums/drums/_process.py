@@ -10,7 +10,7 @@ import psutil
 
 
 class ProcessMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "dimon_processmonitor",
+    def __init__(self, result_queue, default_interval, name = "drums_processmonitor",
         fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
@@ -32,24 +32,24 @@ class ProcessMonitor(TaskBase):
         try:
             logging.debug("Registering pid: %s" % (task,))
             self.task_map[task] = (psutil.Process(task), meta)
-            return DimonError.SUCCESS
+            return DrumsError.SUCCESS
         except psutil.NoSuchProcess:
             logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
                 % (self, task))
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
         except psutil.AccessDenied:
             logging.error("[in %s] Error adding PID (AccessDenied) `%s`"
                 % (self, task))
-            return DimonError.ACCESSDENIED
+            return DrumsError.ACCESSDENIED
 
     def remove_task_core(self, task, meta=''):
         try:
             del self.task_map[task]
-            return DimonError.SUCCESS
+            return DrumsError.SUCCESS
         except KeyError:
             logging.error("[in %s] Error removing PID `%s`"
                 % (self, task))
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
 
     def do(self):
         data = dict()

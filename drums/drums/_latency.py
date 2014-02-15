@@ -17,7 +17,7 @@ thread/process/coroutine though.
 """
 
 class LatencyMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, pings_per_interval, wait_between_pings = 0.1, name = "dimon_latencymonitor"):
+    def __init__(self, result_queue, default_interval, pings_per_interval, wait_between_pings = 0.1, name = "drums_latencymonitor"):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.pings_per_interval = pings_per_interval
         self.target = None
@@ -31,11 +31,11 @@ class LatencyMonitor(TaskBase):
     def register_task_core(self, task, meta=''):
         assert isinstance(meta, basestring)
         self.target = (task, meta)
-        return DimonError.SUCCESS
+        return DrumsError.SUCCESS
 
     def remove_task_core(self, task, meta=''):
         self.target = None
-        return DimonError.SUCCESS
+        return DrumsError.SUCCESS
 
     def do(self):
         if not self.target:

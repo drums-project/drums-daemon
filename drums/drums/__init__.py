@@ -16,7 +16,7 @@ from _latency import LatencyMonitor
 from threading import Lock
 
 from pprint import pprint
-class Dimon():
+class Drums():
     def __init__(self, process_interval = 1, host_interval = 1,
         socket_interval = 1, late_interval = 1, late_pings_per_interval = 4, late_wait_between_pings = 0.1, process_fields = [], host_fields = []):
         self.q = Queue()
@@ -62,27 +62,27 @@ class Dimon():
         if self.proc == None:
             logging.debug("Creating a ProcessMonitor object")
             self.proc = ProcessMonitor(self.q, self.process_interval,
-             "dimon_processmonitor", self.process_fields)
+             "drums_processmonitor", self.process_fields)
             self.proc.start()
 
     def _create_host_monitor(self):
         if self.host == None:
             logging.debug("Creating a HostMonitor object")
             self.host = HostMonitor(self.q, self.host_interval,
-             "dimon_hostmonitor", self.host_fields)
+             "drums_hostmonitor", self.host_fields)
             self.host.start()
     def _create_socket_monitor(self, inet="any"):
         if self.sock == None:
             logging.debug("Creating a SocketMonitor object")
             self.sock = SocketMonitor(self.q, self.socket_interval,
-             inet, "dimon_socketmonitor")
+             inet, "drums_socketmonitor")
             self.sock.start()
 
     def _create_new_latency_monitor(self, target):
         # TODO: Customize name
         if target not in self.late:
             logging.debug("Creating a new LatencyMonitor object for %s" % (target,))
-            mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'dimon_latency_monitor')
+            mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'drums_latency_monitor')
             self.late[target] = mon
             return True
         else:
@@ -128,7 +128,7 @@ class Dimon():
     def monitor_pid(self, pid, callback, meta=''):
         self._create_proc_monitor()
         res = self.proc.register_task(pid, meta)
-        if res == DimonError.SUCCESS:
+        if res == DrumsError.SUCCESS:
             with self.lock:
                 self.callback_map[pid] = callback
         return res
@@ -137,7 +137,7 @@ class Dimon():
         self._create_host_monitor()
         # TODO: Change 'host' to variable key
         res = self.host.register_task('host', meta)
-        if res == DimonError.SUCCESS:
+        if res == DrumsError.SUCCESS:
             with self.lock:
                 self.callback_map['host'] = callback
         return res
@@ -148,7 +148,7 @@ class Dimon():
     #        self._create_socket_monitor()
     #        with self.lock:
     #            self.callback_map['sock'] = callback
-    #    return DimonError.SUCCESS
+    #    return DrumsError.SUCCESS
 
     # def add_socket_to_monitor(self, sock):
     #     """
@@ -156,7 +156,7 @@ class Dimon():
     #     """
     #     if self.sock == None:
     #         raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
-    #         return DimonError.RUNTIME
+    #         return DrumsError.RUNTIME
 
     #     return self.sock.register_task(sock)
 
@@ -167,7 +167,7 @@ class Dimon():
         #self.socket_inet = inet
         self._create_socket_monitor()
         res = self.sock.register_task(sock, meta)
-        if res == DimonError.SUCCESS:
+        if res == DrumsError.SUCCESS:
             with self.lock:
                 proto, direction, port = sock
                 self.callback_map["%s:%s" % (proto, port)] = callback
@@ -177,24 +177,24 @@ class Dimon():
         if self._create_new_latency_monitor(target):
             self.late[target].start()
             res = self.late[target].register_task(target, meta)
-            if (res == DimonError.SUCCESS):
+            if (res == DrumsError.SUCCESS):
                 with self.lock:
                     self.callback_map[target] = callback
             return res
 
     def remove_host(self):
         if not self.host:
-            logging.error("Dimon HostMonitor has not been started yet.")
-            return DimonError.NOTFOUND
+            logging.error("Drums HostMonitor has not been started yet.")
+            return DrumsError.NOTFOUND
 
         res = self.host.remove_task('host')
-        if res == DimonError.SUCCESS:
+        if res == DrumsError.SUCCESS:
             try:
                 with self.lock:
                     del self.callback_map['host']
             except:
                 logging.error("host not in internal monitoring map. This should never happen")
-                return DimonError.UNEXPECTED
+                return DrumsError.UNEXPECTED
             finally:
                 self._shutdown_monitor(self.host)
                 self.host = None
@@ -202,17 +202,17 @@ class Dimon():
 
     def remove_pid(self, pid):
         if not self.proc:
-            logging.error("Dimon ProcessMonitor has not been started yet.")
-            return DimonError.NOTFOUND
+            logging.error("Drums ProcessMonitor has not been started yet.")
+            return DrumsError.NOTFOUND
 
         res = self.proc.remove_task(pid)
-        if res == DimonError.SUCCESS:
+        if res == DrumsError.SUCCESS:
             try:
                 with self.lock:
                     del self.callback_map[pid]
             except KeyError:
                 logging.error("pid not in internal monitoring map. This should never happen")
-                return DimonError.UNEXPECTED
+                return DrumsError.UNEXPECTED
             finally:
                 pass
                 # TODO: Find a way to shutdown processmonitor when pid
@@ -225,8 +225,8 @@ class Dimon():
 
     def remove_socket(self, sock, meta=''):
         if not self.sock:
-            logging.error("Dimon SockMonitor has not been started yet.")
-            return DimonError.NOTFOUND
+            logging.error("Drums SockMonitor has not been started yet.")
+            return DrumsError.NOTFOUND
         # TODO
         return self.sock.remove_task(sock, meta)
 
@@ -241,10 +241,10 @@ class Dimon():
                 return res
             except KeyError:
                 logging.error("KeyError while deleting latency task. This should never happen")
-                return DimonError.UNEXPECTED
+                return DrumsError.UNEXPECTED
         else:
             logging.error("Latency Monitor task (%s) not found." % (target,))
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
 
     def shutdown(self):
         logging.info("Shutting down all active monitors")

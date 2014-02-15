@@ -7,7 +7,7 @@ except ImportError:
 
 def get_version():
     INIT = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                           'dimon', '__init__.py'))
+                           'drums', '__init__.py'))
     f = open(INIT, 'r')
     try:
         for line in f:
@@ -25,14 +25,14 @@ def get_version():
 VERSION = get_version()
 
 setup(
-    name = 'dimon',
+    name = 'drums',
     version = VERSION,
     author = 'Mani Monajjemi',
     author_email = 'TODO',
-    packages = ['dimon'],
+    packages = ['drums'],
     url = 'TODO',
     license = 'LICENSE',
     install_requires = ['pcapy', 'psutil >= 1.1', 'setproctitle'],
     description = 'TODO',
-    test_suite = 'test.test_dimon.get_suite'
+    test_suite = 'test.test_drums.get_suite'
 )

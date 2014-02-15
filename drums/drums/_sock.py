@@ -7,8 +7,6 @@ Socket monitoring daemon
 from _common import *
 
 import pcapy
-from impacket import ImpactDecoder, ImpactPacket
-from pprint import pprint
 
 """
 The [base] SocektMonitor will maintain a filter  list (of strings). The libpcap
@@ -104,7 +102,7 @@ def populate_data(data, port, len):
     #    data[port] = len
 
 class SocketMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, inet, name="dimon_sockmonitor"):
+    def __init__(self, result_queue, default_interval, inet, name="drums_sockmonitor"):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.inet = inet
 
@@ -152,7 +150,7 @@ class SocketMonitor(TaskBase):
         if meta:
             self.meta[proto][port].add(meta)
         self.update_filters()
-        return DimonError.SUCCESS
+        return DrumsError.SUCCESS
 
     def remove_task_core(self, task, meta=''):
         try:
@@ -165,10 +163,10 @@ class SocketMonitor(TaskBase):
                 del self.data[proto][str(port)]
                 del self.meta[proto][str(port)]
                 self.update_filters()
-            return DimonError.SUCCESS
+            return DrumsError.SUCCESS
         except KeyError:
             logging.error("Error removing socket filter: %s" % (task,))
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
 
     def do(self):
         # TODO: Check if re-implementing the IMPacket would improve performance

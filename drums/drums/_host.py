@@ -9,7 +9,7 @@ import psutil
 from pprint import pprint
 
 class HostMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "dimon_hostmonitor", fields = [], pids = []):
+    def __init__(self, result_queue, default_interval, name = "drums_hostmonitor", fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):
@@ -42,16 +42,16 @@ class HostMonitor(TaskBase):
         assert isinstance(meta, basestring)
         logging.debug("Registering host")
         self.task_map['host'] = (psutil, meta)
-        return DimonError.SUCCESS
+        return DrumsError.SUCCESS
 
 
     def remove_task_core(self, task, meta=''):
         try:
             del self.task_map['host']
-            return DimonError.SUCCESS
+            return DrumsError.SUCCESS
         except KeyError:
             logging.error("Error removing host")
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
 
     def do(self):
         data = dict()

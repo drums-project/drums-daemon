@@ -15,7 +15,7 @@ import sys
 import signal
 import logging
 
-from dimon._common import *
+from drums._common import *
 from pprint import pprint
 
 class BasicTask(TaskBase):
@@ -24,14 +24,14 @@ class BasicTask(TaskBase):
 
     def register_task_core(self, task, meta=''):
         self.task_map[task] = (0, meta)
-        return DimonError.SUCCESS
+        return DrumsError.SUCCESS
 
     def remove_task_core(self, task, meta=''):
         try:
             del self.task_map[task]
-            return DimonError.SUCCESS
+            return DrumsError.SUCCESS
         except KeyError:
-            return DimonError.NOTFOUND
+            return DrumsError.NOTFOUND
 
     def do(self):
         if self.task_map:
@@ -48,12 +48,12 @@ class TaskBaseTest(unittest.TestCase):
         meta = 'dummytask'
         task = BasicTask(q, 0.1)
         task.start()
-        self.assertEqual(task.register_task('t1', meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task('t1', meta), DrumsError.SUCCESS)
         try:
             time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 1)
-            self.assertEqual(task.register_task('t2'), DimonError.SUCCESS)
+            self.assertEqual(task.register_task('t2'), DrumsError.SUCCESS)
             time.sleep(0.25)
             d = q.get(); task.flush_result_queue()
             self.assertEqual(len(d), 2)
@@ -72,7 +72,7 @@ class TaskBaseTest(unittest.TestCase):
             task.set_terminate_event()
             task.join()
 
-from dimon._process import ProcessMonitor
+from drums._process import ProcessMonitor
 from psutil import Process
 class ProcessTaskTest(unittest.TestCase):
     def test_process_creation(self):
@@ -83,7 +83,7 @@ class ProcessTaskTest(unittest.TestCase):
         meta = 'myself'
         #TODO: Why does the following return's the subprocess PID?
         pid = os.getpid()
-        self.assertEqual(task.register_task(pid, meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(pid, meta), DrumsError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -113,7 +113,7 @@ class ProcessTaskTest(unittest.TestCase):
             task.set_terminate_event()
             task.join()
 
-from dimon._host import HostMonitor
+from drums._host import HostMonitor
 import psutil
 class HostTaskTest(unittest.TestCase):
     def test_host_creation(self):
@@ -121,7 +121,7 @@ class HostTaskTest(unittest.TestCase):
         task = HostMonitor(q, 0.1)
         task.start()
         meta = 'hostishu'
-        self.assertEqual(task.register_task(None, meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(None, meta), DrumsError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -149,7 +149,7 @@ class HostTaskTest(unittest.TestCase):
             task.set_terminate_event()
             task.join()
 
-from dimon._sock import SocketMonitor
+from drums._sock import SocketMonitor
 import subprocess
 
 class SocketTaskTest(unittest.TestCase):
@@ -190,8 +190,8 @@ class SocketTaskTest(unittest.TestCase):
         t2 = ("udp", "dst", "4444")
         meta1 = 'netcat'
         meta2 = 'dummy'
-        self.assertEqual(task.register_task(t2, meta2), DimonError.SUCCESS)
-        self.assertEqual(task.register_task(t1, meta1), DimonError.SUCCESS)
+        self.assertEqual(task.register_task(t2, meta2), DrumsError.SUCCESS)
+        self.assertEqual(task.register_task(t1, meta1), DrumsError.SUCCESS)
         # Wait some time until all packets get captured,
         # threaded mode needs more time
         #task.flush_result_queue()
@@ -237,7 +237,7 @@ class SocketTaskTest(unittest.TestCase):
         for p in self.p_list:
             os.killpg(p.pid, signal.SIGTERM)
 
-from dimon._latency import LatencyMonitor
+from drums._latency import LatencyMonitor
 class LatencyTaskTest(unittest.TestCase):
     def test_latency_basic(self):
         q = Queue()
@@ -245,7 +245,7 @@ class LatencyTaskTest(unittest.TestCase):
         task.start()
 
         meta = "to-localhost"
-        self.assertEqual(task.register_task("127.0.0.1", meta), DimonError.SUCCESS)
+        self.assertEqual(task.register_task("127.0.0.1", meta), DrumsError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
@@ -287,8 +287,8 @@ def _sr(s):
     """
     return s[::-1]
 
-from dimon import Dimon
-class DimonTest(unittest.TestCase):
+from drums import Drums
+class DrumsTest(unittest.TestCase):
     def setUp(self):
         self.flag = 0
         self.flag_another = 0
@@ -311,7 +311,7 @@ class DimonTest(unittest.TestCase):
             self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
             time.sleep(0.1)
 
-        self.d = Dimon(process_interval=0.5,
+        self.d = Drums(process_interval=0.5,
                        host_interval=1.5,
                        socket_interval=1.0,
                        late_interval=1.0,
@@ -349,7 +349,7 @@ class DimonTest(unittest.TestCase):
         self.assertNotEqual(data['error'], data['avg'])
         self.assertEqual(_sr(target), data['meta'])
 
-    def test_dimon_callback(self):
+    def test_drums_callback(self):
         # The _sr is used to reverse the key before sending that as meta
         # This equality will be checked in callbacks to test if meta
         # is being transmitted back OK.
@@ -387,6 +387,6 @@ def get_suite():
     test_suite.addTest(unittest.makeSuite(HostTaskTest))
     test_suite.addTest(unittest.makeSuite(SocketTaskTest))
     test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
-    test_suite.addTest(unittest.makeSuite(DimonTest))
+    test_suite.addTest(unittest.makeSuite(DrumsTest))
     return test_suite
 

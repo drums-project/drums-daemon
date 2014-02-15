@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Common functions and classes for dimon
+Common functions and classes for drums
 """
 
 # idea from : http://stackoverflow.com/a/9252020/1215297
@@ -25,7 +25,7 @@ import sys
 import logging
 import time
 
-class __dimon__error():
+class __drums__error():
     def __init__(self):
         self.SUCCESS  = 0
         self.NOTFOUND = 1
@@ -34,7 +34,7 @@ class __dimon__error():
         self.RUNTIME = 4
         self.UNEXPECTED = 5
 
-DimonError = __dimon__error()
+DrumsError = __drums__error()
 
 # TODO: Write test
 def namedtuple_to_dict(nt):
@@ -56,7 +56,7 @@ def psutil_convert(data):
 
 # TODO: Merge these classes
 class TaskBase(Thread):
-    def __init__(self, result_queue, default_interval, name="dimon_basetask"):
+    def __init__(self, result_queue, default_interval, name="drums_basetask"):
         Thread.__init__(self, target = None, name = name)
         assert default_interval > 0
         self._default_interval = default_interval
@@ -106,7 +106,7 @@ class TaskBase(Thread):
             try:
                 return self.feedback_queue.get(block=True, timeout=5)
             except Empty:
-                return DimonError.TIMEOUT
+                return DrumsError.TIMEOUT
         except Full:
             logging.error("Queue is full %s", self)
 
@@ -117,7 +117,7 @@ class TaskBase(Thread):
                 # Wait 5 seconds for the feeback
                 return self.feedback_queue.get(block=True, timeout=5)
             except Empty:
-                return DimonError.TIMEOUT
+                return DrumsError.TIMEOUT
         except Full:
             logging.error("Queue is full %s", self)
 
