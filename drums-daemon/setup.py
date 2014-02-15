@@ -6,7 +6,7 @@ except ImportError:
     from distutils.core import setup
 
 def get_version():
-    INIT = os.path.abspath(os.path.join(os.path.dirname(__file__), 'dimond.py'))
+    INIT = os.path.abspath(os.path.join(os.path.dirname(__file__), 'drumsd.py'))
     f = open(INIT, 'r')
     try:
         for line in f:
@@ -24,15 +24,15 @@ def get_version():
 VERSION = get_version()
 
 setup(
-    name = 'dimon-daemon',
+    name = 'drums-daemon',
     version = VERSION,
     author = 'Mani Monajjemi',
     author_email = 'TODO',
     packages = [],
     url = 'TODO',
     license = 'LICENSE',
-    install_requires = ['bottle >= 0.10', 'dimon', 'pyzmq >= 2.2', 'msgpack-python'],
+    install_requires = ['bottle >= 0.10', 'drums', 'pyzmq >= 2.2', 'msgpack-python'],
     description = 'TODO',
-    scripts = ["dimond.py"],
-    test_suite = 'test.test_dimond.get_suite'
+    scripts = ["drumsd.py"],
+    test_suite = 'test.test_drumsd.get_suite'
 )

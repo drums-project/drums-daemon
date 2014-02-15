@@ -18,15 +18,15 @@ import msgpack
 import json
 import socket
 
-from dimon import Dimon, DimonError
+from drums import Drums, DrumsError
 from pprint import pprint
 
 __err_map = {
-    DimonError.SUCCESS: 200,
-    DimonError.NOTFOUND: 404,
-    DimonError.ACCESSDENIED: 403,
-    DimonError.RUNTIME: 406,
-    DimonError.UNEXPECTED: 500
+    DrumsError.SUCCESS: 200,
+    DrumsError.NOTFOUND: 404,
+    DrumsError.ACCESSDENIED: 403,
+    DrumsError.RUNTIME: 406,
+    DrumsError.UNEXPECTED: 500
 }
 
 def http_response(err):
@@ -214,10 +214,10 @@ class Filter(object):
         else:
             return None
 
-class DimonDaemon(object):
+class DrumsDaemon(object):
     def __init__(self, config = dict(), debug = None):
         self.config = config
-        self.dimon = Dimon(
+        self.drums = Drums(
             process_interval = self.config.get('process_interval', 1.0),
             host_interval = self.config.get('host_interval', 1.0),
             socket_interval = self.config.get('socket_interval', 1.0),
@@ -227,7 +227,7 @@ class DimonDaemon(object):
             process_fields = self.config.get("process_fields", list()),
             host_fields = self.config.get("host_fields", list()))
         self.hostname = socket.gethostname()
-        logging.info("Dimon and Bottle initialized")
+        logging.info("Drums and Bottle initialized")
         logging.info("Hostname is %s" % self.hostname)
         self.ctx = zmq.Context()
         self.sock = self.ctx.socket(zmq.PUB)
@@ -253,10 +253,10 @@ class DimonDaemon(object):
             #print ">>> loop ", self.loop_counter
             try:
                 # This is a blocking call
-                self.dimon.spin_once()
+                self.drums.spin_once()
             except KeyboardInterrupt:
-                logging.info("Shutting down dimon ...")
-                self.dimon.shutdown()
+                logging.info("Shutting down drums ...")
+                self.drums.shutdown()
                 return True
 
     def _extract_meta(self):
@@ -318,29 +318,29 @@ class DimonDaemon(object):
     # These are called in Bottle thread's context
     def add_filter(self, kind, key, key_path):
         if (self.data_filter.add(kind, key, key_path)):
-            return http_response(DimonError.SUCCESS)
+            return http_response(DrumsError.SUCCESS)
         else:
-            return http_response(DimonError.RUNTIME)
+            return http_response(DrumsError.RUNTIME)
 
     def remove_filter(self, kind, key, key_path):
         if (self.data_filter.remove(kind, key, key_path)):
-            return http_response(DimonError.SUCCESS)
+            return http_response(DrumsError.SUCCESS)
         else:
-            return http_response(DimonError.NOTFOUND)
+            return http_response(DrumsError.NOTFOUND)
     def get_info(self):
-        return {"name": "Dimon Daemon",
+        return {"name": "Drums Daemon",
                 "version": __version__,
                 "api_version": __api__,
                 "zmq_publish": self.zmq_addr_outside}
 
     def add_pid(self, pid):
         # Cache entry will be created automatically on first callback call
-        http_response(self.dimon.monitor_pid(pid, self._callback_pid, self._extract_meta()))
+        http_response(self.drums.monitor_pid(pid, self._callback_pid, self._extract_meta()))
 
     def remove_pid(self, pid):
         # Cache entry should manually be removed
         self.cache_pid.remove_key('pid', pid)
-        http_response(self.dimon.remove_pid(pid))
+        http_response(self.drums.remove_pid(pid))
 
     def add_filter_pid(self, pid, key_path):
         return self.add_filter('pid', pid, key_path)
@@ -353,13 +353,13 @@ class DimonDaemon(object):
         if d:
             return d
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def enable_host(self):
-        http_response(self.dimon.monitor_host(self._callback_host, self._extract_meta()))
+        http_response(self.drums.monitor_host(self._callback_host, self._extract_meta()))
 
     def disable_host(self):
-        http_response(self.dimon.remove_host())
+        http_response(self.drums.remove_host())
 
     def add_filter_host(self, key_path):
         return self.add_filter('host', 'host', key_path)
@@ -372,61 +372,61 @@ class DimonDaemon(object):
         if d:
             return d
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def add_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
-            http_response(self.dimon.monitor_target_latency(target, self._callback_latency, self._extract_meta()))
+            http_response(self.drums.monitor_target_latency(target, self._callback_latency, self._extract_meta()))
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def remove_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
-            http_response(self.dimon.remove_target_latency(target))
+            http_response(self.drums.remove_target_latency(target))
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def add_filter_latency(self, target, key_path):
         if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
             return self.add_filter('latency', target, key_path)
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def remove_filter_latency(self, target, key_path):
         if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
             return self.remove_filter('latency', target, key_path)
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def get_latency(self, target, key_path = None):
         if not (self.__host_regex.match(target) or self.__ip_regex.match(target)):
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
         d = self.cache_latency.get('latency', target, key_path)
         if d:
             return d
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def add_socket(self, proto, direction, port):
         # This will happen if necessary
         if direction == "bi":
             direction = ""
-        http_response(self.dimon.monitor_socket((proto, direction, port), self._callback_sock, self._extract_meta()))
+        http_response(self.drums.monitor_socket((proto, direction, port), self._callback_sock, self._extract_meta()))
 
 
 
-        #res = self.dimon.create_monitor_socket(self._callback_sock)
-        #if  res == DimonError.SUCCESS:
+        #res = self.drums.create_monitor_socket(self._callback_sock)
+        #if  res == DrumsError.SUCCESS:
         #    if direction == "bi":
         #        direction = ""
-        #    http_response(self.dimon.add_socket_to_monitor((proto, direction, port)))
+        #    http_response(self.drums.add_socket_to_monitor((proto, direction, port)))
         #else:
          #   http_response(res)
 
     def remove_socket(self, proto, direction, port):
         if direction == "bi":
                 direction = ""
-        http_response(self.dimon.remove_socket((proto, direction, port), self._extract_meta()))
+        http_response(self.drums.remove_socket((proto, direction, port), self._extract_meta()))
 
     def add_filter_socket(self, key_path):
         return self.add_filter('socket', 'socket', key_path)
@@ -439,7 +439,7 @@ class DimonDaemon(object):
         if d:
             return d
         else:
-            http_response(DimonError.NOTFOUND)
+            http_response(DrumsError.NOTFOUND)
 
     def get_filters(self):
         return str(self.data_filter)
@@ -447,18 +447,18 @@ class DimonDaemon(object):
     def remove_filters(self):
         try:
            self.data_filter.reset()
-           return http_response(DimonError.SUCCESS)
+           return http_response(DrumsError.SUCCESS)
         except:
-            return http_response(DimonError.RUNTIME)
+            return http_response(DrumsError.RUNTIME)
 
 if __name__ == "__main__":
     config = dict()
 
     # TODO: Level
-    logging.basicConfig(filename=config.get('logfile', 'dimond.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
+    logging.basicConfig(filename=config.get('logfile', 'drumsd.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
 
     # TODO: API version should be static for each call, not from __api__
-    rp = "/dimon/v%s" % (__api__,)
+    rp = "/drums/v%s" % (__api__,)
 
     path_pid_base = rp + "/%s/pid"
     path_pid_monitor = (path_pid_base % 'monitor') + "/<pid:int>"
@@ -477,8 +477,8 @@ if __name__ == "__main__":
     path_socket_get = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
     #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
 
-    logging.info("Starting dimon-daemon.")
-    app = DimonDaemon(config)
+    logging.info("Starting drums-daemon.")
+    app = DrumsDaemon(config)
 
     ### Routes
     bottle.debug(True)
