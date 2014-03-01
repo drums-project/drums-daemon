@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# TODO
-
 __version__ = "0.9"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
@@ -21,8 +19,7 @@ class Drums():
             self, process_interval=1, host_interval=1,
             socket_interval=1, late_interval=1,
             late_pings_per_interval=4, late_wait_between_pings=0.1,
-            process_fields=[], host_fields=[]
-            ):
+            process_fields=[], host_fields=[]):
         self.q = Queue()
         self.process_inetrval = process_interval
         self.host_interval = host_interval
@@ -68,8 +65,7 @@ class Drums():
             self.__logger.debug("Creating a ProcessMonitor object")
             self.proc = ProcessMonitor(
                 self.q, self.process_interval,
-                "drums_processmonitor", self.process_fields
-                )
+                "drums_processmonitor", self.process_fields)
             self.proc.start()
 
     def _create_host_monitor(self):
@@ -91,27 +87,32 @@ class Drums():
     def _create_new_latency_monitor(self, target):
         # TODO: Customize name
         if target not in self.late:
-            self.__logger.debug("Creating a new LatencyMonitor object for %s" % (target,))
-            mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'drums_latency_monitor')
+            self.__logger.debug(
+                "Creating a new LatencyMonitor object for %s" % (target,))
+            mon = LatencyMonitor(
+                self.q, self.late_interval, self.late_pings_per_interval,
+                self.late_wait_between_pings, 'drums_latency_monitor')
             self.late[target] = mon
             return True
         else:
-            self.__logger.warning("Unable to create a new monitor. A Latency monitor already exists for %s" % (target,))
+            self.__logger.warning(
+                "Unable to create a new monitor. \
+                A Latency monitor already exists for %s" % (target,))
             return False
 
     def set_process_interval(self, interval):
         self.process_interval = interval
-        if not self.proc == None:
+        if not self.proc is None:
             self.proc.set_interval(self.process_interval)
 
     def set_process_fields(self, fields):
         self.process_fields = fields
-        if not self.proc == None:
+        if not self.proc is None:
             self.proc.set_fields(self.process_fields)
 
     def set_host_interval(self, interval):
         self.host_interval = interval
-        if not self.host == None:
+        if not self.host is None:
             self.host.set_interval(self.host_interval)
 
     def set_late_interval(self, interval):
@@ -121,12 +122,12 @@ class Drums():
 
     def set_host_fields(self, fields):
         self.host_fields = fields
-        if not self.host == None:
+        if not self.host is None:
             self.host.set_fields(self.host_fields)
 
     def set_sock_interval(self, interval):
         self.socket_interval = interval
-        if not self.sock == None:
+        if not self.sock is None:
             self.sock.set_interval(self.sock_interval)
 
     def set_latency_options(self, pings_per_interval, wait_between_pings):
@@ -203,7 +204,8 @@ class Drums():
                 with self.lock:
                     del self.callback_map['host']
             except:
-                self.__logger.error("host not in internal monitoring map. This should never happen")
+                self.__logger.error(
+                    "host not in internal monitoring map. This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 self._shutdown_monitor(self.host)
@@ -212,7 +214,8 @@ class Drums():
 
     def remove_pid(self, pid):
         if not self.proc:
-            self.__logger.error("Drums ProcessMonitor has not been started yet.")
+            self.__logger.error(
+                "Drums ProcessMonitor has not been started yet.")
             return DrumsError.NOTFOUND
 
         res = self.proc.remove_task(pid)
@@ -221,7 +224,8 @@ class Drums():
                 with self.lock:
                     del self.callback_map[pid]
             except KeyError:
-                self.__logger.error("pid not in internal monitoring map. This should never happen")
+                self.__logger.error(
+                    "pid not in internal monitoring map. This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 pass
@@ -250,10 +254,13 @@ class Drums():
                 del self.late[target]
                 return res
             except KeyError:
-                self.__logger.error("KeyError while deleting latency task. This should never happen")
+                self.__logger.error(
+                    "KeyError while deleting latency task. \
+                    This should never happen")
                 return DrumsError.UNEXPECTED
         else:
-            self.__logger.error("Latency Monitor task (%s) not found." % (target,))
+            self.__logger.error(
+                "Latency Monitor task (%s) not found." % (target,))
             return DrumsError.NOTFOUND
 
     def shutdown(self):
