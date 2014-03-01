@@ -1,9 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
 
 try:
     from setuptools.core import setup
 except ImportError:
     from distutils.core import setup
+
 
 def get_version():
     INIT = os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -25,14 +29,14 @@ def get_version():
 VERSION = get_version()
 
 setup(
-    name = 'drums',
-    version = VERSION,
-    author = 'Mani Monajjemi',
-    author_email = 'TODO',
-    packages = ['drums'],
-    url = 'TODO',
-    license = 'LICENSE',
-    install_requires = ['pcapy', 'psutil >= 1.1', 'setproctitle'],
-    description = 'TODO',
-    test_suite = 'test.test_drums.get_suite'
+    name='drums',
+    version=VERSION,
+    author='Mani Monajjemi',
+    author_email='mmonajje@sfu.ca',
+    packages=['drums'],
+    url='http://autonomylab.org/drums/',
+    license='LICENSE',
+    install_requires=['pcapy', 'psutil >= 1.1', 'setproctitle'],
+    description='System Monitoring Library',
+    test_suite='test.test_drums.get_suite'
 )

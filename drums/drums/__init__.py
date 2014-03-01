@@ -3,7 +3,7 @@
 
 # TODO
 
-__version__ = "0.1.0"
+__version__ = "0.9"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
 from _common import *
@@ -15,18 +15,22 @@ from _latency import LatencyMonitor
 # To guarantee thread safety
 from threading import Lock
 
-from pprint import pprint
+
 class Drums():
-    def __init__(self, process_interval = 1, host_interval = 1,
-        socket_interval = 1, late_interval = 1, late_pings_per_interval = 4, late_wait_between_pings = 0.1, process_fields = [], host_fields = []):
+    def __init__(
+            self, process_interval=1, host_interval=1,
+            socket_interval=1, late_interval=1,
+            late_pings_per_interval=4, late_wait_between_pings=0.1,
+            process_fields=[], host_fields=[]
+            ):
         self.q = Queue()
-        self.process_interval = process_interval
+        self.process_inetrval = process_interval
         self.host_interval = host_interval
         self.socket_interval = socket_interval
         self.process_fields = process_fields
         self.host_fields = host_fields
         self.socket_inet = "any"
-        self.late_interval =late_interval
+        self.late_interval = late_interval
         self.late_pings_per_interval = late_pings_per_interval
         self.late_wait_between_pings = late_wait_between_pings
 
@@ -40,6 +44,7 @@ class Drums():
 
         self.callback_map = dict()
         self.lock = Lock()
+        self.__logger = logging.getLogger(__name__)
 
     def flush_result_queue(self):
         #TODO: Check errors?
@@ -47,46 +52,51 @@ class Drums():
             self.q.get()
 
     def _shutdown_monitor(self, mon):
-        logging.info("Trying to kill `%s`" % (mon, ))
+        self.__logger.info("Trying to kill `%s`" % (mon, ))
         mon.set_terminate_event()
-        logging.info("Waiting for process `%s` to finish." % (mon, ))
+        self.__logger.info("Waiting for process `%s` to finish." % (mon, ))
         mon.join()
         #while mon.is_alive():
-        #    logging.info("> killing `%s`" % (mon, ))
+        #    self.__logger.info("> killing `%s`" % (mon, ))
         #    mon.set_terminate_event()
         #    time.sleep(0.1)
-        #logging.info("Killed `%s`" % (mon, ))
+        #self.__logger.info("Killed `%s`" % (mon, ))
         #mon.join()
 
     def _create_proc_monitor(self):
-        if self.proc == None:
-            logging.debug("Creating a ProcessMonitor object")
-            self.proc = ProcessMonitor(self.q, self.process_interval,
-             "drums_processmonitor", self.process_fields)
+        if self.proc is None:
+            self.__logger.debug("Creating a ProcessMonitor object")
+            self.proc = ProcessMonitor(
+                self.q, self.process_interval,
+                "drums_processmonitor", self.process_fields
+                )
             self.proc.start()
 
     def _create_host_monitor(self):
-        if self.host == None:
-            logging.debug("Creating a HostMonitor object")
-            self.host = HostMonitor(self.q, self.host_interval,
-             "drums_hostmonitor", self.host_fields)
+        if self.host is None:
+            self.__logger.debug("Creating a HostMonitor object")
+            self.host = HostMonitor(
+                self.q, self.host_interval,
+                "drums_hostmonitor", self.host_fields)
             self.host.start()
+
     def _create_socket_monitor(self, inet="any"):
-        if self.sock == None:
-            logging.debug("Creating a SocketMonitor object")
-            self.sock = SocketMonitor(self.q, self.socket_interval,
-             inet, "drums_socketmonitor")
+        if self.sock is None:
+            self.__logger.debug("Creating a SocketMonitor object")
+            self.sock = SocketMonitor(
+                self.q, self.socket_interval,
+                inet, "drums_socketmonitor")
             self.sock.start()
 
     def _create_new_latency_monitor(self, target):
         # TODO: Customize name
         if target not in self.late:
-            logging.debug("Creating a new LatencyMonitor object for %s" % (target,))
+            self.__logger.debug("Creating a new LatencyMonitor object for %s" % (target,))
             mon = LatencyMonitor(self.q, self.late_interval, self.late_pings_per_interval, self.late_wait_between_pings, 'drums_latency_monitor')
             self.late[target] = mon
             return True
         else:
-            logging.warning("Unable to create a new monitor. A Latency monitor already exists for %s" % (target,))
+            self.__logger.warning("Unable to create a new monitor. A Latency monitor already exists for %s" % (target,))
             return False
 
     def set_process_interval(self, interval):
@@ -184,7 +194,7 @@ class Drums():
 
     def remove_host(self):
         if not self.host:
-            logging.error("Drums HostMonitor has not been started yet.")
+            self.__logger.error("Drums HostMonitor has not been started yet.")
             return DrumsError.NOTFOUND
 
         res = self.host.remove_task('host')
@@ -193,7 +203,7 @@ class Drums():
                 with self.lock:
                     del self.callback_map['host']
             except:
-                logging.error("host not in internal monitoring map. This should never happen")
+                self.__logger.error("host not in internal monitoring map. This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 self._shutdown_monitor(self.host)
@@ -202,7 +212,7 @@ class Drums():
 
     def remove_pid(self, pid):
         if not self.proc:
-            logging.error("Drums ProcessMonitor has not been started yet.")
+            self.__logger.error("Drums ProcessMonitor has not been started yet.")
             return DrumsError.NOTFOUND
 
         res = self.proc.remove_task(pid)
@@ -211,7 +221,7 @@ class Drums():
                 with self.lock:
                     del self.callback_map[pid]
             except KeyError:
-                logging.error("pid not in internal monitoring map. This should never happen")
+                self.__logger.error("pid not in internal monitoring map. This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 pass
@@ -225,7 +235,7 @@ class Drums():
 
     def remove_socket(self, sock, meta=''):
         if not self.sock:
-            logging.error("Drums SockMonitor has not been started yet.")
+            self.__logger.error("Drums SockMonitor has not been started yet.")
             return DrumsError.NOTFOUND
         # TODO
         return self.sock.remove_task(sock, meta)
@@ -240,21 +250,21 @@ class Drums():
                 del self.late[target]
                 return res
             except KeyError:
-                logging.error("KeyError while deleting latency task. This should never happen")
+                self.__logger.error("KeyError while deleting latency task. This should never happen")
                 return DrumsError.UNEXPECTED
         else:
-            logging.error("Latency Monitor task (%s) not found." % (target,))
+            self.__logger.error("Latency Monitor task (%s) not found." % (target,))
             return DrumsError.NOTFOUND
 
     def shutdown(self):
-        logging.info("Shutting down all active monitors")
-        if not self.proc == None:
+        self.__logger.info("Shutting down all active monitors")
+        if not self.proc is None:
             self._shutdown_monitor(self.proc)
             self.proc = None
-        if not self.host == None:
+        if not self.host is None:
             self._shutdown_monitor(self.host)
             self.host = None
-        if not self.sock == None:
+        if not self.sock is None:
             self._shutdown_monitor(self.sock)
             self.sock = None
         for target, late in self.late.items():
@@ -270,15 +280,11 @@ class Drums():
                 with self.lock:
                     self.callback_map[task](task, data)
             except KeyError:
-                logging.error("Error calling callback for task=%s"
+                self.__logger.error(
+                    "Error calling callback for task=%s"
                     % (task,))
 
     def spin(self):
         self.running = True
         while True:
             self.spin_once()
-
-
-
-
-
