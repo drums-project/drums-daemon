@@ -84,7 +84,7 @@ class TaskBase(Thread):
         self.__logger.info("Initiated a new Task Request: %s" % (self.name,))
 
     def __repr__(self):
-        name =  self.__class__.__name__
+        name = self.__class__.__name__
         return '<%s at %#x>' % (name, id(self))
 
     # TODO: Not Thread Safe
@@ -140,37 +140,36 @@ class TaskBase(Thread):
         try:
             self._last_loop_time = time.time()
             while not self._terminate_event.is_set():
-                # Process command queue
-                # while not self.cmd_queue.empty():
-                #     cmd, task = self.cmd_queue.get()
-                #     # Send feedback using feedback_queue
-                #     if cmd == 'a':
-                #         self.feedback_queue.put(self.register_task_core(task))
-                #     elif cmd == 'r':
-                #         self.feedback_queue.put(self.remove_task_core(task))
-                #     else:
-                #         raise ValueError("cmd %s not recognized in %s" % (cmd, self))
                 self.do()
                 diff = time.time() - self._last_loop_time
                 sleep_time = self._default_interval - diff
                 if sleep_time <= 0.0:
-                    self.__logger.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
+                    self.__logger.warning(
+                        "Default interval for `%s` is too small (%s) \
+                        for the task. Last loop: %s" % \
+                        (self.name, self._default_interval, diff))
                 else:
                     # Process Command Queue in idle time
                     idle_start = time.time()
-                    self.__logger.info("[running time] %s, %.9f", self.name, diff)
+                    #self.__logger.info(
+                    #    "[running time] %s, %.9f", self.name, diff)
                     while True:
                         remaining_time = idle_start + sleep_time - time.time()
                         if remaining_time < 0:
                             break
                         try:
-                            cmd, task, meta = self.cmd_queue.get(block=True, timeout=remaining_time)
+                            cmd, task, meta = self.cmd_queue.get(
+                                block=True, timeout=remaining_time)
                             if cmd == 'a':
-                                self.feedback_queue.put(self.register_task_core(task, meta))
+                                self.feedback_queue.put(
+                                    self.register_task_core(task, meta))
                             elif cmd == 'r':
-                                self.feedback_queue.put(self.remove_task_core(task, meta))
+                                self.feedback_queue.put(
+                                    self.remove_task_core(task, meta))
                             else:
-                                raise ValueError("cmd %s not recognized in %s" % (cmd, self))
+                                raise ValueError(
+                                    "cmd %s not recognized in %s"
+                                    % (cmd, self))
                         except Empty:
                             break
 
@@ -180,6 +179,8 @@ class TaskBase(Thread):
                 self.feedback_queue.get()
             self.__logger.debug("Task %s terminated.", self)
         except:
-            self.__logger.warning("Task(%s) exited with '%s'" % (self.name, sys.exc_info()))
+            self.__logger.warning(
+                "Task(%s) exited with '%s'" %
+                (self.name, sys.exc_info()))
 
         return True
