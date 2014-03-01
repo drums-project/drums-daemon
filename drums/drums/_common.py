@@ -7,15 +7,16 @@ Common functions and classes for drums
 # idea from : http://stackoverflow.com/a/9252020/1215297
 #concurrency_impl = 'gevent' # single process, single thread
 #concurrency_impl = 'threading' # single process, multiple threads
-concurrency_impl = 'multiprocessing' # multiple processes
+concurrency_impl = 'multiprocessing'  # multiple processes
 
 if concurrency_impl == 'gevent':
-    import gevent.monkey; gevent.monkey.patch_all()
+    import gevent.monkey
+    gevent.monkey.patch_all()
 
 if concurrency_impl in ['gevent', 'threading']:
-    from threading import Thread, Event, Lock
+    from threading import Thread, Event
     from Queue import Queue, Empty, Full
-if concurrency_impl == 'multiprocessing':
+elif concurrency_impl == 'multiprocessing':
     from multiprocessing import Process as Thread
     from multiprocessing import Queue, Event
     from Queue import Empty, Full
@@ -25,9 +26,10 @@ import sys
 import logging
 import time
 
+
 class __drums__error():
     def __init__(self):
-        self.SUCCESS  = 0
+        self.SUCCESS = 0
         self.NOTFOUND = 1
         self.ACCESSDENIED = 2
         self.TIMEOUT = 3
@@ -36,9 +38,11 @@ class __drums__error():
 
 DrumsError = __drums__error()
 
+
 # TODO: Write test
 def namedtuple_to_dict(nt):
-    return {name:getattr(nt, name) for name in nt._fields}
+    return {name: getattr(nt, name) for name in nt._fields}
+
 
 # TODO: Refactor to Python < 2.7
 # TODO: Write test
@@ -54,10 +58,10 @@ def psutil_convert(data):
     else:
         return data
 
-# TODO: Merge these classes
+
 class TaskBase(Thread):
     def __init__(self, result_queue, default_interval, name="drums_basetask"):
-        Thread.__init__(self, target = None, name = name)
+        Thread.__init__(self, target=None, name=name)
         assert default_interval > 0
         self._default_interval = default_interval
         # TODO: Check the overhead of calling 2 time() per loop
@@ -70,12 +74,14 @@ class TaskBase(Thread):
         self.feedback_queue = Queue()
         self.daemon = True
         self.name = name
+        self.__logger = logging.getLogger(__name__)
+
         try:
             setproctitle(self.name)
         except NameError:
-            logging.warn("setproctitle is not available.")
+            self.__logger.warn("setproctitle is not available.")
             pass
-        logging.info("Initiated a new Task Request: %s" % (self.name,))
+        self.__logger.info("Initiated a new Task Request: %s" % (self.name,))
 
     def __repr__(self):
         name =  self.__class__.__name__
@@ -108,7 +114,7 @@ class TaskBase(Thread):
             except Empty:
                 return DrumsError.TIMEOUT
         except Full:
-            logging.error("Queue is full %s", self)
+            self.__logger.error("Queue is full %s", self)
 
     def remove_task(self, task, meta=''):
         try:
@@ -119,7 +125,7 @@ class TaskBase(Thread):
             except Empty:
                 return DrumsError.TIMEOUT
         except Full:
-            logging.error("Queue is full %s", self)
+            self.__logger.error("Queue is full %s", self)
 
     def register_task_core(self, task, meta=''):
         raise NotImplementedError
@@ -148,11 +154,11 @@ class TaskBase(Thread):
                 diff = time.time() - self._last_loop_time
                 sleep_time = self._default_interval - diff
                 if sleep_time <= 0.0:
-                    logging.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
+                    self.__logger.warning("Default interval for `%s` is too small (%s) for the task. Last loop: %s" % (self.name, self._default_interval, diff))
                 else:
                     # Process Command Queue in idle time
                     idle_start = time.time()
-                    logging.info("[running time] %s, %.9f", self.name, diff)
+                    self.__logger.info("[running time] %s, %.9f", self.name, diff)
                     while True:
                         remaining_time = idle_start + sleep_time - time.time()
                         if remaining_time < 0:
@@ -172,8 +178,8 @@ class TaskBase(Thread):
 
             while not self.feedback_queue.empty():
                 self.feedback_queue.get()
-            logging.debug("Task %s terminated.", self)
+            self.__logger.debug("Task %s terminated.", self)
         except:
-            logging.warning("Task(%s) exited with '%s'" % (self.name, sys.exc_info()))
+            self.__logger.warning("Task(%s) exited with '%s'" % (self.name, sys.exc_info()))
 
         return True

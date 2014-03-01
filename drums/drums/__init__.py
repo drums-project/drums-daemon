@@ -205,7 +205,8 @@ class Drums():
                     del self.callback_map['host']
             except:
                 self.__logger.error(
-                    "host not in internal monitoring map. This should never happen")
+                    "host not in internal monitoring map. \
+                    This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 self._shutdown_monitor(self.host)
@@ -225,7 +226,8 @@ class Drums():
                     del self.callback_map[pid]
             except KeyError:
                 self.__logger.error(
-                    "pid not in internal monitoring map. This should never happen")
+                    "pid not in internal monitoring map. \
+                    This should never happen")
                 return DrumsError.UNEXPECTED
             finally:
                 pass
