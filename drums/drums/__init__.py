@@ -15,7 +15,10 @@ from threading import Thread, Event, Lock
 
 
 class Singleton(type):
-    """ A singleton metaclass. """
+    """
+    A singleton metaclass.
+    From: http://c2.com/cgi/wiki?PythonSingleton
+    """
     def __init__(cls, name, bases, dictionary):
         super(Singleton, cls).__init__(name, bases, dictionary)
         cls._instance = None
@@ -26,19 +29,6 @@ class Singleton(type):
             if cls._instance is None:
                 cls._instance = super(Singleton, cls).__call__(*args, **kws)
         return cls._instance
-
-
-class SingletonMixin(object):
-    __singleton_lock = Lock()
-    __singleton_instance = None
-
-    @classmethod
-    def GetInstance(cls):
-        if not cls.__singleton_instance:
-            with cls.__singleton_lock:
-                if not cls.__singleton_instance:
-                    cls.__singleton_instance = cls()
-        return cls.__singleton_instance
 
 
 class Drums(Thread):
