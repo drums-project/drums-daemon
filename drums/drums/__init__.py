@@ -11,15 +11,45 @@ from _sock import SocketMonitor
 from _latency import LatencyMonitor
 
 # To guarantee thread safety
-from threading import Lock
+from threading import Thread, Event, Lock
 
 
-class Drums(object):
+class Singleton(type):
+    """ A singleton metaclass. """
+    def __init__(cls, name, bases, dictionary):
+        super(Singleton, cls).__init__(name, bases, dictionary)
+        cls._instance = None
+        cls._lock = Lock()
+
+    def __call__(cls, *args, **kws):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(Singleton, cls).__call__(*args, **kws)
+        return cls._instance
+
+
+class SingletonMixin(object):
+    __singleton_lock = Lock()
+    __singleton_instance = None
+
+    @classmethod
+    def GetInstance(cls):
+        if not cls.__singleton_instance:
+            with cls.__singleton_lock:
+                if not cls.__singleton_instance:
+                    cls.__singleton_instance = cls()
+        return cls.__singleton_instance
+
+
+class Drums(Thread):
+    __metaclass__ = Singleton
+
     def __init__(
             self, process_interval=1, host_interval=1,
             socket_interval=1, late_interval=1,
             late_pings_per_interval=4, late_wait_between_pings=0.1,
             process_fields=[], host_fields=[]):
+        Thread.__init__(self)
         self.q = Queue()
         self.process_interval = process_interval
         self.host_interval = host_interval
@@ -30,8 +60,8 @@ class Drums(object):
         self.late_interval = late_interval
         self.late_pings_per_interval = late_pings_per_interval
         self.late_wait_between_pings = late_wait_between_pings
-
-        self.running = False
+        self.terminate_event = Event()
+        self.is_running = Event()
 
         # Monitors
         self.proc = None
@@ -40,8 +70,13 @@ class Drums(object):
         self.late = dict()
 
         self.callback_map = dict()
+        # TODO: Breakdown locks
         self.lock = Lock()
         self.logger = logging.getLogger(type(self).__name__)
+
+    def init(self):
+        if not self.is_running.is_set():
+            self.start()
 
     def flush_result_queue(self):
         #TODO: Check errors?
@@ -69,12 +104,11 @@ class Drums(object):
             self.proc.start()
 
     def _create_host_monitor(self):
-        if self.host is None:
-            self.logger.debug("Creating a HostMonitor object")
-            self.host = HostMonitor(
-                self.q, self.host_interval,
-                "drums_hostmonitor", self.host_fields)
-            self.host.start()
+        self.logger.debug("Creating a HostMonitor object")
+        self.host = HostMonitor(
+            self.q, self.host_interval,
+            "drums_hostmonitor", self.host_fields)
+        self.host.start()
 
     def _create_socket_monitor(self, inet="any"):
         if self.sock is None:
@@ -152,24 +186,6 @@ class Drums(object):
             with self.lock:
                 self.callback_map['host'] = callback
         return res
-
-    #def create_monitor_socket(self, callback, inet="any"):
-    #    if not self.sock:
-    #        self.socket_inet = inet
-    #        self._create_socket_monitor()
-    #        with self.lock:
-    #            self.callback_map['sock'] = callback
-    #    return DrumsError.SUCCESS
-
-    # def add_socket_to_monitor(self, sock):
-    #     """
-    #     sock: tuple("tcp/udp", "src/dst/''", port number)
-    #     """
-    #     if self.sock == None:
-    #         raise RuntimeError("You need to register a callback first using `create_monitor_socket`.")
-    #         return DrumsError.RUNTIME
-
-    #     return self.sock.register_task(sock)
 
     def monitor_socket(self, sock, callback, meta=''):
         """
@@ -265,35 +281,58 @@ class Drums(object):
                 "Latency Monitor task (%s) not found." % (target,))
             return DrumsError.NOTFOUND
 
-    def shutdown(self):
-        self.logger.info("Shutting down all active monitors")
-        if not self.proc is None:
-            self._shutdown_monitor(self.proc)
-            self.proc = None
-        if not self.host is None:
-            self._shutdown_monitor(self.host)
-            self.host = None
-        if not self.sock is None:
-            self._shutdown_monitor(self.sock)
-            self.sock = None
-        for target, late in self.late.items():
-            self._shutdown_monitor(self.late[target])
-            del self.late[target]
+    def is_shutdown(self):
+        return self.terminate_event.is_set()
 
-    def spin_once(self):
+    def shutdown(self):
+        if not self.is_running.is_set():
+            self.logger.warning("Drums is not running ...")
+            return
+
+        self.logger.info("Shutting down drums ...")
+        self.q.put({'shutdown': {'shutdown', None}})
+        self.terminate_event.set()
+
+        while self.is_running.is_set():
+            pass
+
+        self.logger.info("Cleaning up ...")
+
+        with self.lock:
+            if not self.proc is None:
+                self._shutdown_monitor(self.proc)
+                self.proc = None
+            if not self.host is None:
+                self._shutdown_monitor(self.host)
+                self.host = None
+            if not self.sock is None:
+                self._shutdown_monitor(self.sock)
+                self.sock = None
+            for target, late in self.late.items():
+                self._shutdown_monitor(self.late[target])
+                del self.late[target]
+
+        self.logger.info("Cleaned up.")
+
+    # This runs its own context
+    def run(self):
         # results are dicts, keys are tasks
         # TODO: BUG get should be non-blocking
-        data_pair_dict = self.q.get()
-        for task, data in data_pair_dict.items():
-            try:
-                with self.lock:
-                    self.callback_map[task](task, data)
-            except KeyError:
-                self.logger.error(
-                    "Error calling callback for task=%s"
-                    % (task,))
+        self.is_running.set()
+        while not self.terminate_event.is_set():
+            data_pair_dict = self.q.get()
+            for task, data in data_pair_dict.items():
+                if task == 'shutdown':
+                    self.logger.info("Shutdown request received ...")
+                    break
+                try:
+                    with self.lock:
+                        self.callback_map[task](task, data)
+                except KeyError:
+                    self.logger.error(
+                        "Error calling callback for task=%s"
+                        % (task,))
 
-    def spin(self):
-        self.running = True
-        while True:
-            self.spin_once()
+        self.logger.info("Drums's thread exited cleanly.")
+        self.is_running.clear()
+        return

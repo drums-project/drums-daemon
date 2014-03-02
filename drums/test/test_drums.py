@@ -331,12 +331,14 @@ class DrumsTest(unittest.TestCase):
                 subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
             time.sleep(0.1)
 
-        self.d = Drums(process_interval=0.5,
-                       host_interval=1.5,
-                       socket_interval=1.0,
-                       late_interval=1.0,
-                       late_pings_per_interval=5,
-                       late_wait_between_pings=0.05)
+        self.d = Drums(
+            process_interval=0.5,
+            host_interval=1.5,
+            socket_interval=1.0,
+            late_interval=1.0,
+            late_pings_per_interval=5,
+            late_wait_between_pings=0.05)
+        self.d.start()
 
     def callback(self, pid, data):
         self.flag += 1
@@ -386,9 +388,9 @@ class DrumsTest(unittest.TestCase):
             'localhost', self.callback_late, _sr('localhost'))
         self.d.monitor_target_latency(
             'google.co.jp', self.callback_late, _sr('google.co.jp'))
-        print "Spinning for 10 times ..."
-        for i in range(10):
-            self.d.spin_once()
+
+        print "Waiting some 5 seconds ..."
+        time.sleep(5)
 
         #print self.flag, self.flag_another, self.flag_host
         self.assertGreater(self.flag, 0)
@@ -417,10 +419,10 @@ def get_suite():
         filename='test.log', level=logging.DEBUG,
         format='[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
     test_suite = unittest.TestSuite()
-    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
-    test_suite.addTest(unittest.makeSuite(HostTaskTest))
-    test_suite.addTest(unittest.makeSuite(SocketTaskTest))
-    test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
+    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    #test_suite.addTest(unittest.makeSuite(HostTaskTest))
+    #test_suite.addTest(unittest.makeSuite(SocketTaskTest))
+    #test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
     test_suite.addTest(unittest.makeSuite(DrumsTest))
     return test_suite
