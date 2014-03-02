@@ -415,7 +415,7 @@ class DrumsTest(unittest.TestCase):
 def get_suite():
     logging.basicConfig(
         filename='test.log', level=logging.DEBUG,
-        format='%(asctime)s %(message)s')
+        format='[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
     test_suite = unittest.TestSuite()
     test_suite.addTest(unittest.makeSuite(TaskBaseTest))
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
