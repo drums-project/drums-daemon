@@ -9,7 +9,6 @@ except ImportError:
     import unittest
 
 import time
-import random
 import os
 import sys
 import signal
@@ -17,6 +16,7 @@ import logging
 
 from drums._common import *
 from pprint import pprint
+
 
 class BasicTask(TaskBase):
     def __init__(self, result_queue, default_interval):
@@ -37,10 +37,13 @@ class BasicTask(TaskBase):
         if self.task_map:
             sys.stdout.write('>')
             sys.stdout.flush()
-            self.task_map = {key:(val+1, meta) for key,(val, meta) in self.task_map.items()}
+            self.task_map = {
+                key: (val+1, meta) for
+                key, (val, meta) in self.task_map.items()}
             #if self.result_queue.empty():
             #pprint(self.task_map)
             self.result_queue.put(self.task_map)
+
 
 class TaskBaseTest(unittest.TestCase):
     def test_basic_task_loop(self):
@@ -51,14 +54,17 @@ class TaskBaseTest(unittest.TestCase):
         self.assertEqual(task.register_task('t1', meta), DrumsError.SUCCESS)
         try:
             time.sleep(0.25)
-            d = q.get(); task.flush_result_queue()
+            d = q.get()
+            task.flush_result_queue()
             self.assertEqual(len(d), 1)
             self.assertEqual(task.register_task('t2'), DrumsError.SUCCESS)
             time.sleep(0.25)
-            d = q.get(); task.flush_result_queue()
+            d = q.get()
+            task.flush_result_queue()
             self.assertEqual(len(d), 2)
             time.sleep(0.5)
-            d = q.get(); task.flush_result_queue()
+            d = q.get()
+            task.flush_result_queue()
             self.assertGreater(d['t1'][0], 0)
             self.assertGreater(d['t2'][0], 0)
             self.assertEqual(d['t1'][1], meta)
@@ -73,7 +79,8 @@ class TaskBaseTest(unittest.TestCase):
             task.join()
 
 from drums._process import ProcessMonitor
-from psutil import Process
+
+
 class ProcessTaskTest(unittest.TestCase):
     def test_process_creation(self):
         q = Queue()
@@ -87,12 +94,13 @@ class ProcessTaskTest(unittest.TestCase):
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 1)
+                d = q.get(block=True, timeout=1)
             except Empty:
-                self.fail("Process monitor did not report anything in 1 seconds")
+                self.fail(
+                    "Process monitor did not report anything in 1 seconds")
             threads = d[pid]['get_threads']
             mem = d[pid]['get_memory_info']['rss']
-            name = d[pid]['name']
+            #name = d[pid]['name']
             getmeta = d[pid]['meta']
             self.assertGreater(len(threads), 0, "Testing number of threads")
             self.assertGreater(mem, 0, "Testing memory")
@@ -104,8 +112,10 @@ class ProcessTaskTest(unittest.TestCase):
             # The task list is empty, no update should be done
             #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
             try:
-                d = q.get(block = True, timeout = 0.1)
-                self.fail("No data should be put into the queue when task map is empty.")
+                d = q.get(block=True, timeout=0.1)
+                self.fail(
+                    "No data should be put into the queue when task \
+                    map is empty.")
             except Empty:
                 pass
 
@@ -114,7 +124,8 @@ class ProcessTaskTest(unittest.TestCase):
             task.join()
 
 from drums._host import HostMonitor
-import psutil
+
+
 class HostTaskTest(unittest.TestCase):
     def test_host_creation(self):
         q = Queue()
@@ -125,7 +136,7 @@ class HostTaskTest(unittest.TestCase):
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 1)
+                d = q.get(block=True, timeout=1)
             except Empty:
                 self.fail("Host monitor did not report anything in 1 seconds")
             #pprint(d)
@@ -140,8 +151,10 @@ class HostTaskTest(unittest.TestCase):
             # The task list is empty, no update should be done
             #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
             try:
-                d = q.get(block = True, timeout = 0.25)
-                self.fail("No data should be put into the queue when task map is empty.")
+                d = q.get(block=True, timeout=0.25)
+                self.fail(
+                    "No data should be put into the queue when task \
+                    map is empty.")
             except Empty:
                 pass
 
@@ -151,6 +164,7 @@ class HostTaskTest(unittest.TestCase):
 
 from drums._sock import SocketMonitor
 import subprocess
+
 
 class SocketTaskTest(unittest.TestCase):
     def setUp(self):
@@ -166,20 +180,13 @@ class SocketTaskTest(unittest.TestCase):
         cmds.append("netcat localhost 3333 < /dev/urandom")
         cmds.append("netcat -u localhost 4444 < /dev/urandom")
 
-        # Process Groups are needed in order to properly kill the netcats running on a spawned shell, from: http://stackoverflow.com/a/4791612/1215297
+        # Process Groups are needed in order to properly kill
+        # the netcats running on a spawned shell
+        # from: http://stackoverflow.com/a/4791612/1215297
         for c in cmds:
-            self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
+            self.p_list.append(
+                subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
             time.sleep(0.1)
-
-        # self.p_list.append(subprocess.Popen(["netcat", "-l", "3333"], stdout = self.null, stderr = self.null))
-        # self.p_list.append(subprocess.Popen(["netcat", "3333"], stdin = self.p1, stdout = self.null, stderr = self.null))
-        # self.p_list.append(subprocess.Popen(["cat", "/dev/urandom"], stdout = self.p1))
-
-        # self.p_list.append(subprocess.Popen(["netcat", "-ul", "4444"], stdout = self.null, stderr = self.null))
-        # self.p_list.append(subprocess.Popen(["netcat", "-u", "3333"], stdin = self.p2, stdout = self.null, stderr = self.null))
-        # self.p_list.append(subprocess.Popen(["cat", "/dev/urandom"], stdout = self.p2))
-
-        #time.sleep(0.1)
 
     def test_socket_basic(self):
         q = Queue()
@@ -198,7 +205,7 @@ class SocketTaskTest(unittest.TestCase):
 
         try:
             try:
-                d = q.get(block = True, timeout = 2)
+                d = q.get(block=True, timeout=2)
             except Empty:
                 self.fail("Socket monitor did not report anything in 2 seconds")
             time.sleep(0.5)
@@ -206,11 +213,15 @@ class SocketTaskTest(unittest.TestCase):
             pprint(d)
             byte_count = d['tcp:3333']['bytes']
             #print "Byte Count: %s" % byte_count
-            self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
+            self.assertGreater(
+                byte_count, 1024,
+                "Bytes captured should be greater than 1KiB")
 
             byte_count = d['udp:4444']['bytes']
             #print "Byte Count: %s" % byte_count
-            self.assertGreater(byte_count, 1024, "Bytes captured should be greater than 1KiB")
+            self.assertGreater(
+                byte_count, 1024,
+                "Bytes captured should be greater than 1KiB")
 
             self.assertEquals(len(d['tcp:3333']['meta']), 1)
             self.assertEquals(len(d['udp:4444']['meta']), 1)
@@ -223,8 +234,10 @@ class SocketTaskTest(unittest.TestCase):
             # The task list is empty, no update should be done
             #self.assertRaises(Queue.Empty, task.result_queue.get(), 1)
             try:
-                d = q.get(block = True, timeout = 0.25)
-                self.fail("No data should be put into the queue when task map is empty.")
+                d = q.get(block=True, timeout=0.25)
+                self.fail(
+                    "No data should be put into the queue when \
+                    task map is empty.")
             except Empty:
                 pass
 
@@ -238,6 +251,8 @@ class SocketTaskTest(unittest.TestCase):
             os.killpg(p.pid, signal.SIGTERM)
 
 from drums._latency import LatencyMonitor
+
+
 class LatencyTaskTest(unittest.TestCase):
     def test_latency_basic(self):
         q = Queue()
@@ -245,11 +260,12 @@ class LatencyTaskTest(unittest.TestCase):
         task.start()
 
         meta = "to-localhost"
-        self.assertEqual(task.register_task("127.0.0.1", meta), DrumsError.SUCCESS)
+        self.assertEqual(
+            task.register_task("127.0.0.1", meta), DrumsError.SUCCESS)
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 5)
+                d = q.get(block=True, timeout=5)
             except Empty:
                 self.fail("Socket monitor did not report anything in 5 seconds")
             data = d['127.0.0.1']
@@ -272,9 +288,10 @@ class LatencyTaskTest(unittest.TestCase):
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block = True, timeout = 5)
+                d = q.get(block=True, timeout=5)
             except Empty:
-                self.fail("Latency monitor did not report anything in 5 seconds")
+                self.fail(
+                    "Latency monitor did not report anything in 5 seconds")
             self.assertNotEqual(d[invalid_domain]['error'], None)
         finally:
             task.set_terminate_event()
@@ -288,6 +305,8 @@ def _sr(s):
     return s[::-1]
 
 from drums import Drums
+
+
 class DrumsTest(unittest.TestCase):
     def setUp(self):
         self.flag = 0
@@ -308,7 +327,8 @@ class DrumsTest(unittest.TestCase):
         cmds.append("netcat localhost 3333 < /dev/urandom")
 
         for c in cmds:
-            self.p_list.append(subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
+            self.p_list.append(
+                subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
             time.sleep(0.1)
 
         self.d = Drums(process_interval=0.5,
@@ -318,13 +338,12 @@ class DrumsTest(unittest.TestCase):
                        late_pings_per_interval=5,
                        late_wait_between_pings=0.05)
 
-
     def callback(self, pid, data):
         self.flag += 1
         self.assertEqual(pid, self.pid)
         threads = data['get_threads']
         mem = data['get_memory_info']['rss']
-        name = data['name']
+        #name = data['name']
         self.assertGreater(len(threads), 0, "Testing number of threads")
         self.assertGreater(mem, 0, "Testing memory")
         #self.assertEqual(name, "python", "Testing app name")
@@ -353,12 +372,20 @@ class DrumsTest(unittest.TestCase):
         # The _sr is used to reverse the key before sending that as meta
         # This equality will be checked in callbacks to test if meta
         # is being transmitted back OK.
-        self.d.monitor_pid(self.pid, self.callback, _sr(str(self.pid))) # Reverse
-        self.d.monitor_pid(self.pid_another, self.callback_another, _sr(str(self.pid_another)))
+        self.d.monitor_pid(
+            self.pid, self.callback,
+            _sr(str(self.pid)))  # Reverse
+        self.d.monitor_pid(
+            self.pid_another, self.callback_another,
+            _sr(str(self.pid_another)))
         self.d.monitor_host(self.callback_host, _sr('host'))
-        self.d.monitor_socket(('tcp', 'dst', '3333'), self.callback_sock, _sr('tcp:3333'))
-        self.d.monitor_target_latency('localhost', self.callback_late, _sr('localhost'))
-        self.d.monitor_target_latency('google.co.jp', self.callback_late, _sr('google.co.jp'))
+        self.d.monitor_socket(
+            ('tcp', 'dst', '3333'),
+            self.callback_sock, _sr('tcp:3333'))
+        self.d.monitor_target_latency(
+            'localhost', self.callback_late, _sr('localhost'))
+        self.d.monitor_target_latency(
+            'google.co.jp', self.callback_late, _sr('google.co.jp'))
         print "Spinning for 10 times ..."
         for i in range(10):
             self.d.spin_once()
@@ -369,18 +396,26 @@ class DrumsTest(unittest.TestCase):
         self.assertGreater(self.flag_host, 0)
         self.assertGreater(self.flag_sock, 0)
         self.assertGreater(self.flag_late, 0)
-        self.assertGreater(self.flag, self.flag_host, "Host monitor should have been called less than process monitor")
-        self.assertGreater(self.flag_sock, self.flag_host, "Host monitor should have been called less than socket monitor")
+        self.assertGreater(
+            self.flag, self.flag_host,
+            "Host monitor should have been called less than process monitor")
+        self.assertGreater(
+            self.flag_sock, self.flag_host,
+            "Host monitor should have been called less than socket monitor")
 
         time.sleep(0.1)
+
     def tearDown(self):
         self.d.shutdown()
         os.kill(self.pid_another, signal.SIGKILL)
         for p in self.p_list:
             os.killpg(p.pid, signal.SIGTERM)
 
+
 def get_suite():
-    logging.basicConfig(filename='test.log', level=logging.DEBUG, format='%(asctime)s %(message)s')
+    logging.basicConfig(
+        filename='test.log', level=logging.DEBUG,
+        format='%(asctime)s %(message)s')
     test_suite = unittest.TestSuite()
     test_suite.addTest(unittest.makeSuite(TaskBaseTest))
     test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
@@ -389,4 +424,3 @@ def get_suite():
     test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
     test_suite.addTest(unittest.makeSuite(DrumsTest))
     return test_suite
-
