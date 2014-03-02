@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = "0.9"
+__version__ = "0.9.0"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
 from _common import *
@@ -21,7 +21,7 @@ class Drums(object):
             late_pings_per_interval=4, late_wait_between_pings=0.1,
             process_fields=[], host_fields=[]):
         self.q = Queue()
-        self.process_inetrval = process_interval
+        self.process_interval = process_interval
         self.host_interval = host_interval
         self.socket_interval = socket_interval
         self.process_fields = process_fields
