@@ -66,6 +66,7 @@ class Drums(Thread):
 
     def init(self):
         if not self.is_running.is_set():
+            self.logger.info("Starting drums's processing thread ...")
             self.start()
 
     def flush_result_queue(self):
@@ -308,6 +309,7 @@ class Drums(Thread):
     def run(self):
         # results are dicts, keys are tasks
         # TODO: BUG get should be non-blocking
+        self.logger.info("Drums's processing thread started.")
         self.is_running.set()
         while not self.terminate_event.is_set():
             data_pair_dict = self.q.get()
@@ -323,6 +325,6 @@ class Drums(Thread):
                         "Error calling callback for task=%s"
                         % (task,))
 
-        self.logger.info("Drums's thread exited cleanly.")
+        self.logger.info("Drums's processing thread exited cleanly.")
         self.is_running.clear()
         return

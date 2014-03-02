@@ -338,7 +338,7 @@ class DrumsTest(unittest.TestCase):
             late_interval=1.0,
             late_pings_per_interval=5,
             late_wait_between_pings=0.05)
-        self.d.start()
+        self.d.init()
 
     def callback(self, pid, data):
         self.flag += 1
