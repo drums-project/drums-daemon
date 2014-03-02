@@ -10,8 +10,9 @@ import psutil
 
 
 class ProcessMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "drums_processmonitor",
-        fields = [], pids = []):
+    def __init__(
+        self, result_queue, default_interval,
+        name="drums_processmonitor", fields = [], pids = []):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):
@@ -22,7 +23,10 @@ class ProcessMonitor(TaskBase):
         if fields:
             self.fields = list(set(fields))
         else:
-            self.fields = ['name', 'status', 'get_cpu_percent', 'get_cpu_times','get_memory_info', 'get_io_counters', 'get_threads', 'cmdline']
+            self.fields = [
+                'name', 'status', 'get_cpu_percent', 'get_cpu_times',
+                'get_memory_info', 'get_io_counters',
+                'get_threads', 'cmdline']
 
     def register_task_core(self, task, meta=''):
         """
@@ -30,15 +34,15 @@ class ProcessMonitor(TaskBase):
         """
         assert isinstance(meta, basestring)
         try:
-            logging.debug("Registering pid: %s" % (task,))
+            self.logger.debug("Registering pid: %s" % (task,))
             self.task_map[task] = (psutil.Process(task), meta)
             return DrumsError.SUCCESS
         except psutil.NoSuchProcess:
-            logging.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
+            self.logger.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
                 % (self, task))
             return DrumsError.NOTFOUND
         except psutil.AccessDenied:
-            logging.error("[in %s] Error adding PID (AccessDenied) `%s`"
+            self.logger.error("[in %s] Error adding PID (AccessDenied) `%s`"
                 % (self, task))
             return DrumsError.ACCESSDENIED
 
@@ -47,7 +51,7 @@ class ProcessMonitor(TaskBase):
             del self.task_map[task]
             return DrumsError.SUCCESS
         except KeyError:
-            logging.error("[in %s] Error removing PID `%s`"
+            self.logger.error("[in %s] Error removing PID `%s`"
                 % (self, task))
             return DrumsError.NOTFOUND
 
@@ -66,8 +70,8 @@ class ProcessMonitor(TaskBase):
                     elif attr is not None:
                         dummy = str(attr)
                     else:
-                        logging.warning("[in %s] Attribute `%s` not found."
-                            % (self, f))
+                        self.logger.warning(
+                            "[in %s] Attribute `%s` not found." % (self, f))
                         continue
 
                     # This is all about the s**t about pickle is not able
@@ -81,18 +85,18 @@ class ProcessMonitor(TaskBase):
                 try:
                     self.result_queue.put(data)
                 except Queue.Full:
-                    logging.error("[in %s] Output queue is full in"
-                        % (self, ))
+                    self.logger.error(
+                        "[in %s] Output queue is full in" % (self, ))
                     #finally:
                     #    pass
 
         except AttributeError:
-           logging.warning("Exception: [in %s] Attribute `%s` not found."
-                            % (self, f))
+            self.logger.warning(
+                "Exception: [in %s] Attribute `%s` not found." % (self, f))
         # TODO: Fix the following circular loople
         except psutil.NoSuchProcess:
-            logging.warning("NoSuchProcess for %s, removing it", pid)
+            self.logger.warning("NoSuchProcess for %s, removing it", pid)
             del self.task_map[pid]
         except psutil.AccessDenied:
-            logging.warning("AccessDenied for %s, removing it", pid)
+            self.logger.warning("AccessDenied for %s, removing it", pid)
             del self.task_map[pid]

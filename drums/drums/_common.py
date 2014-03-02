@@ -74,14 +74,14 @@ class TaskBase(Thread):
         self.feedback_queue = Queue()
         self.daemon = True
         self.name = name
-        self.__logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(type(self).__name__)
 
         try:
             setproctitle(self.name)
         except NameError:
-            self.__logger.warn("setproctitle is not available.")
+            self.logger.warn("setproctitle is not available.")
             pass
-        self.__logger.info("Initiated a new Task Request: %s" % (self.name,))
+        self.logger.info("Initiated a new Task Request: %s" % (self.name,))
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -114,7 +114,7 @@ class TaskBase(Thread):
             except Empty:
                 return DrumsError.TIMEOUT
         except Full:
-            self.__logger.error("Queue is full %s", self)
+            self.logger.error("Queue is full %s", self)
 
     def remove_task(self, task, meta=''):
         try:
@@ -125,7 +125,7 @@ class TaskBase(Thread):
             except Empty:
                 return DrumsError.TIMEOUT
         except Full:
-            self.__logger.error("Queue is full %s", self)
+            self.logger.error("Queue is full %s", self)
 
     def register_task_core(self, task, meta=''):
         raise NotImplementedError
@@ -144,14 +144,14 @@ class TaskBase(Thread):
                 diff = time.time() - self._last_loop_time
                 sleep_time = self._default_interval - diff
                 if sleep_time <= 0.0:
-                    self.__logger.warning(
+                    self.logger.warning(
                         "Default interval for `%s` is too small (%s) \
-                        for the task. Last loop: %s" % \
+                        for the task. Last loop: %s" %
                         (self.name, self._default_interval, diff))
                 else:
                     # Process Command Queue in idle time
                     idle_start = time.time()
-                    #self.__logger.info(
+                    #self.logger.info(
                     #    "[running time] %s, %.9f", self.name, diff)
                     while True:
                         remaining_time = idle_start + sleep_time - time.time()
@@ -177,9 +177,9 @@ class TaskBase(Thread):
 
             while not self.feedback_queue.empty():
                 self.feedback_queue.get()
-            self.__logger.debug("Task %s terminated.", self)
+            self.logger.debug("Task %s terminated.", self)
         except:
-            self.__logger.warning(
+            self.logger.warning(
                 "Task(%s) exited with '%s'" %
                 (self.name, sys.exc_info()))
 
