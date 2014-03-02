@@ -6,10 +6,12 @@ Host monitoring daemon
 
 from _common import *
 import psutil
-from pprint import pprint
+
 
 class HostMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, name = "drums_hostmonitor", fields = [], pids = []):
+    def __init__(
+            self, result_queue, default_interval,
+            name="drums_hostmonitor", fields=[], pids=[]):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):
@@ -21,9 +23,10 @@ class HostMonitor(TaskBase):
             self.fields = list(set(fields))
         else:
             # TODO: why does get_boot_time() throw exception?
-            self.fields = ['BOOT_TIME', 'cpu_percent', 'cpu_times',
-            'virtual_memory','swap_memory', 'disk_usage',
-            'disk_io_counters', 'net_io_counters']
+            self.fields = [
+                'BOOT_TIME', 'cpu_percent', 'cpu_times',
+                'virtual_memory', 'swap_memory', 'disk_usage',
+                'disk_io_counters', 'net_io_counters']
 
             # I hate these version compatibility hack!
             # Even on Ubuntu 13.04, python-psutil points to 0.6
@@ -40,17 +43,16 @@ class HostMonitor(TaskBase):
         add current host to task_map
         """
         assert isinstance(meta, basestring)
-        logging.debug("Registering host")
+        self.logger.debug("Registering host")
         self.task_map['host'] = (psutil, meta)
         return DrumsError.SUCCESS
-
 
     def remove_task_core(self, task, meta=''):
         try:
             del self.task_map['host']
             return DrumsError.SUCCESS
         except KeyError:
-            logging.error("Error removing host")
+            self.logger.error("Error removing host")
             return DrumsError.NOTFOUND
 
     def do(self):
@@ -65,9 +67,9 @@ class HostMonitor(TaskBase):
             attr = getattr(psutil, f, None)
             if callable(attr):
                 if f == "cpu_percent":
-                    dummy = attr(interval = 0, percpu = False)
+                    dummy = attr(interval=0, percpu=False)
                 elif f == "cpu_times":
-                    dummy = attr(percpu = False)
+                    dummy = attr(percpu=False)
                 #elif f in ["disk_io_counters", "disk_usage"]:
                     # TODO: Implement this
                 #    continue
@@ -75,16 +77,16 @@ class HostMonitor(TaskBase):
                     # TODO: pernic=True returns a dict to tuples
                     # which psutil_convert() function does not know
                     # how to convert it yet
-                    dummy = attr(pernic = False)
+                    dummy = attr(pernic=False)
                 elif f in ["virtual_memory", "swap_memory"]:
                     dummy = attr()
                 else:
                     # Not supported yet
                     continue
-            elif attr != None:
+            elif attr is not None:
                 dummy = str(attr)
             else:
-                #logging.debug("[in %s] Attribute `%s` not found."
+                #self.logger.debug("[in %s] Attribute `%s` not found."
                 #    % (self, f))
                 continue
 
@@ -103,8 +105,7 @@ class HostMonitor(TaskBase):
                 data['host']['meta'] = self.task_map['host'][1]
                 self.result_queue.put(data)
             except Queue.Full:
-                logging.error("[in %s] Output queue is full in"
-                    % (self, ))
+                self.logger.error(
+                    "[in %s] Output queue is full in" % (self, ))
             finally:
-                pass#pprint(data)
-
+                pass

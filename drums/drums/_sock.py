@@ -25,6 +25,7 @@ __any_length = 16
 LINK_LAYER_ETH = 1
 LINK_LAYER_SLL = 2
 
+
 def parse_header(packet, link_layer):
     tcp_sport, tcp_dport, udp_sport, udp_dport = None, None, None, None
 
@@ -56,7 +57,7 @@ def parse_header(packet, link_layer):
         if protocol == 6:
             t = iph_length + pad
             tcp_header = packet[t:t+20]
-            tcph = unpack('!HHLLBBHHH' , tcp_header)
+            tcph = unpack('!HHLLBBHHH', tcp_header)
             tcp_sport = tcph[0]
             tcp_dport = tcph[1]
             #sequence = tcph[2]
@@ -76,6 +77,7 @@ def parse_header(packet, link_layer):
 
     return tcp_sport, tcp_dport, udp_sport, udp_dport
 
+
 def tasktuple_to_filterstr(task):
     """
     task = (proto, src/dst, port), e.g ("UDP", "dst", 53) or ("TCP", "", 80)
@@ -88,12 +90,14 @@ def tasktuple_to_filterstr(task):
         raise ValueError("[in %s] Protocol %s not supported." % (self, proto))
 
     if not direction in ["src", "dst", ""]:
-        raise ValueError("[in %s] Direction %s not supported." % (self, direction))
+        raise ValueError(
+            "[in %s] Direction %s not supported." % (self, direction))
 
     if not port > 0:
         raise ValueError("[in %s] Invalid port number %s" % (self, port))
 
     return (proto, direction, port, "%s %s port %s" % (proto, direction, port))
+
 
 def populate_data(data, port, len):
     if port in data:
@@ -101,8 +105,11 @@ def populate_data(data, port, len):
     #else:
     #    data[port] = len
 
+
 class SocketMonitor(TaskBase):
-    def __init__(self, result_queue, default_interval, inet, name="drums_sockmonitor"):
+    def __init__(
+            self, result_queue, default_interval, inet,
+            name="drums_sockmonitor"):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.inet = inet
 
@@ -113,13 +120,13 @@ class SocketMonitor(TaskBase):
 
         datalink = self.pc.datalink()
         if pcapy.DLT_EN10MB == datalink:
-            self.link_layer = LINK_LAYER_ETH # Ethernet
+            self.link_layer = LINK_LAYER_ETH  # Ethernet
         elif pcapy.DLT_LINUX_SLL == datalink:
-            self.link_layer = LINK_LAYER_SLL # Any
+            self.link_layer = LINK_LAYER_SLL  # Any
         else:
             raise Exception("Datalink type not supported: %s" % datalink)
 
-        logging.info("Datalink is : %d", self.link_layer)
+        self.logger.info("Datalink is : %d", self.link_layer)
         self.filter_str = ""
         self.packets_per_callback = 0
         self.data = dict()
@@ -133,10 +140,9 @@ class SocketMonitor(TaskBase):
     def update_filters(self):
         filters = ["(%s)" % (f,) for f in self.task_map.keys()]
         self.filter_str = " or ".join(filters)
-        logging.debug("Updating pcap filter to `%s`" % (self.filter_str,))
+        self.logger.debug("Updating pcap filter to `%s`" % (self.filter_str,))
         #print "Setting filter to %s" % self.filter_str
         self.pc.setfilter(self.filter_str)
-
 
     def register_task_core(self, task, meta=''):
         assert isinstance(meta, basestring)
@@ -165,22 +171,17 @@ class SocketMonitor(TaskBase):
                 self.update_filters()
             return DrumsError.SUCCESS
         except KeyError:
-            logging.error("Error removing socket filter: %s" % (task,))
+            self.logger.error("Error removing socket filter: %s" % (task,))
             return DrumsError.NOTFOUND
 
     def do(self):
         # TODO: Check if re-implementing the IMPacket would improve performance
         def process_callback(hdr, packetdata):
             self.packets_per_callback += 1
-
-            #packet_ts = float(hdr.getts()[0]) + float(hdr.getts()[1]) * 1.0e-6
-
-            # getcaplen() is equal to the length of the part of the packet that has been captured, not the total length of the packet, thus should never be used for bw calculation
-
             packet_len = hdr.getlen()
 
-                #print "-" * 10, packet_len
-            tcp_sport, tcp_dport, udp_sport, udp_dport = parse_header(packetdata, self.link_layer)
+            tcp_sport, tcp_dport, udp_sport, udp_dport = parse_header(
+                packetdata, self.link_layer)
             if tcp_sport and tcp_dport:
                 populate_data(self.data['tcp'], str(tcp_sport), packet_len)
                 populate_data(self.data['tcp'], str(tcp_dport), packet_len)
@@ -188,7 +189,7 @@ class SocketMonitor(TaskBase):
                 populate_data(self.data['udp'], str(udp_sport), packet_len)
                 populate_data(self.data['udp'], str(udp_dport), packet_len)
             else:
-                logging.warning("Parse Header failed for packet.")
+                self.logger.warning("Parse Header failed for packet.")
             # Link layer decoder
             #packet = self.decoder.decode(packetdata)
             #return
@@ -215,7 +216,8 @@ class SocketMonitor(TaskBase):
         self.packets_per_callback = 0
         # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
-        logging.info("packets per callback: %d" % (self.packets_per_callback, ))
+        self.logger.info(
+            "packets per callback: %d" % (self.packets_per_callback, ))
 
         _data = dict()
         #_data['__ppc__'] = self.packets_per_callback
@@ -229,14 +231,13 @@ class SocketMonitor(TaskBase):
             for proto in ['tcp', 'udp']:
                 for port, bytes in self.data[proto].items():
                     _key = "%s:%s" % (proto, port)
-                    _data[_key] = {'timestamp': timestamp, 'bytes': bytes, 'meta': list(self.meta[proto][port])}
+                    _data[_key] = {
+                        'timestamp': timestamp, 'bytes': bytes,
+                        'meta': list(self.meta[proto][port])}
             try:
                 self.result_queue.put(_data)
             except Full:
-                logging.error("[in %s] Output queue is full in"
-                    % (self, ))
+                self.logger.error(
+                    "[in %s] Output queue is full in" % (self, ))
             finally:
-                pass#pprint(data)
-
-
-
+                pass

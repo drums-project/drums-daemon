@@ -11,8 +11,8 @@ import psutil
 
 class ProcessMonitor(TaskBase):
     def __init__(
-        self, result_queue, default_interval,
-        name="drums_processmonitor", fields = [], pids = []):
+            self, result_queue, default_interval,
+            name="drums_processmonitor", fields=[], pids=[]):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):
@@ -38,12 +38,12 @@ class ProcessMonitor(TaskBase):
             self.task_map[task] = (psutil.Process(task), meta)
             return DrumsError.SUCCESS
         except psutil.NoSuchProcess:
-            self.logger.error("[in %s] Error adding PID (NoSuchProcess) `%s`"
-                % (self, task))
+            self.logger.error(
+                "[in %s] Error adding PID (NoSuchProcess) `%s`" % (self, task))
             return DrumsError.NOTFOUND
         except psutil.AccessDenied:
-            self.logger.error("[in %s] Error adding PID (AccessDenied) `%s`"
-                % (self, task))
+            self.logger.error(
+                "[in %s] Error adding PID (AccessDenied) `%s`" % (self, task))
             return DrumsError.ACCESSDENIED
 
     def remove_task_core(self, task, meta=''):
@@ -51,8 +51,7 @@ class ProcessMonitor(TaskBase):
             del self.task_map[task]
             return DrumsError.SUCCESS
         except KeyError:
-            self.logger.error("[in %s] Error removing PID `%s`"
-                % (self, task))
+            self.logger.error("[in %s] Error removing PID `%s`" % (self, task))
             return DrumsError.NOTFOUND
 
     def do(self):
