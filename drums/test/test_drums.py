@@ -419,10 +419,10 @@ def get_suite():
         filename='test.log', level=logging.DEBUG,
         format='[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
     test_suite = unittest.TestSuite()
-    #test_suite.addTest(unittest.makeSuite(TaskBaseTest))
-    #test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
-    #test_suite.addTest(unittest.makeSuite(HostTaskTest))
-    #test_suite.addTest(unittest.makeSuite(SocketTaskTest))
-    #test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
+    test_suite.addTest(unittest.makeSuite(TaskBaseTest))
+    test_suite.addTest(unittest.makeSuite(ProcessTaskTest))
+    test_suite.addTest(unittest.makeSuite(HostTaskTest))
+    test_suite.addTest(unittest.makeSuite(SocketTaskTest))
+    test_suite.addTest(unittest.makeSuite(LatencyTaskTest))
     test_suite.addTest(unittest.makeSuite(DrumsTest))
     return test_suite
