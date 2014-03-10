@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__version__ = "0.1.0"
+__version__ = "0.9.0"
 # Who needs precision for API version?
 __api__ = "1"
 
@@ -17,6 +17,7 @@ import zmq
 import msgpack
 import json
 import socket
+import time
 
 from drums import Drums, DrumsError
 from pprint import pprint
@@ -28,6 +29,7 @@ __err_map = {
     DrumsError.RUNTIME: 406,
     DrumsError.UNEXPECTED: 500
 }
+
 
 def http_response(err):
     bottle.response.status = __err_map.get(err, 400)
@@ -67,7 +69,7 @@ class MsgpackSafeCache:
             self.caches[k] = copy(data)
 
     # returns json
-    def get(self, _type, key, key_path = None):
+    def get(self, _type, key, key_path=None):
         k = self._key(_type, key)
         with self.index_lock:
             if not k in self.index:
@@ -85,7 +87,7 @@ class MsgpackSafeCache:
                 else:
                     cached = msgpack.loads(self.caches[k])
                     data = dict()
-                    data['type'] = cached['type']+'/'+ key_path
+                    data['type'] = cached['type'] + '/' + key_path
                     data['key'] = cached['key']
                     data['timestamp'] = cached['data'].get('timestamp', None)
 
@@ -165,7 +167,8 @@ class Filter(object):
         keys = {}
         found = False
         for _type in types:
-            keys[_type] = self.__search_keys(self.tree[_type], [data['key'], '~'])
+            keys[_type] = self.__search_keys(
+                self.tree[_type], [data['key'], '~'])
             if keys[_type]:
                 found = True
 
@@ -188,7 +191,9 @@ class Filter(object):
                     try:
                         # This is non-destructive
                         if path[0]:
-                            d = reduce(lambda di, key: di.get(key, None), path, data['data'])
+                            d = reduce(
+                                lambda di, key: di.get(key, None),
+                                path, data['data'])
                         else:
                             d = data['data']
                     except AttributeError:
@@ -208,27 +213,30 @@ class Filter(object):
                             ret = ret[p]
                         prev[p] = d
 
-
         if ret_root['data']:
             return ret_root
         else:
             return None
 
+
 class DrumsDaemon(object):
-    def __init__(self, config = dict(), debug = None):
+    def __init__(self, config=dict(), debug=None):
+        self.logger = logging.getLogger(type(self).__name__)
         self.config = config
         self.drums = Drums(
-            process_interval = self.config.get('process_interval', 1.0),
-            host_interval = self.config.get('host_interval', 1.0),
-            socket_interval = self.config.get('socket_interval', 1.0),
-            late_interval = self.config.get('late_interval', 1.0),
-            late_pings_per_interval = self.config.get('late_pings_per_interval', 5),
-            late_wait_between_pings = self.config.get("late_wait_between_pings", 0.1),
-            process_fields = self.config.get("process_fields", list()),
-            host_fields = self.config.get("host_fields", list()))
+            process_interval=self.config.get('process_interval', 1.0),
+            host_interval=self.config.get('host_interval', 1.0),
+            socket_interval=self.config.get('socket_interval', 1.0),
+            late_interval=self.config.get('late_interval', 1.0),
+            late_pings_per_interval=self.config.get(
+                'late_pings_per_interval', 5),
+            late_wait_between_pings=self.config.get(
+                "late_wait_between_pings", 0.1),
+            process_fields=self.config.get("process_fields", list()),
+            host_fields=self.config.get("host_fields", list()))
         self.hostname = socket.gethostname()
-        logging.info("Drums and Bottle initialized")
-        logging.info("Hostname is %s" % self.hostname)
+        self.logger.info("Drums and Bottle initialized")
+        self.logger.info("Hostname is %s" % self.hostname)
         self.ctx = zmq.Context()
         self.sock = self.ctx.socket(zmq.PUB)
         self.zmq_addr = "tcp://*:" + str(self.config.get('publish_port', 8002))
@@ -237,27 +245,31 @@ class DrumsDaemon(object):
         self.loop_counter = 0
         self.data_filter = Filter()
 
-        #self.__host_regex = re.compile("(?=^.{1,254}$)(^(?:(?!\d|-)[a-zA-Z0-9\-]{1,63}(?<!-)\.?)+(?:[a-zA-Z]{2,})$)")
-        self.__host_regex = re.compile('^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$')
+        self.__host_regex = re.compile(
+            '^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$')
         self.__ip_regex = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
-
 
         self.cache_socket = MsgpackSafeCache()
         self.cache_host = MsgpackSafeCache()
         self.cache_latency = MsgpackSafeCache()
         self.cache_pid = MsgpackSafeCache()
 
+        # Starts drums in a new thread
+        self.drums.init()
+
     def loop(self):
-        while True:
-            self.loop_counter += 1
-            #print ">>> loop ", self.loop_counter
-            try:
-                # This is a blocking call
-                self.drums.spin_once()
-            except KeyboardInterrupt:
-                logging.info("Shutting down drums ...")
-                self.drums.shutdown()
-                return True
+        self.logger.info("drums-daemon app's main loop started ...")
+
+        try:
+            while not self.drums.is_shutdown():
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            self.logger.info("CTRL+C heard in the main loop ...")
+            self.logger.info("Shutting down drums ...")
+            self.drums.shutdown()  # Block until clean shutdown
+            self.logger.info("Shutting down drums-daemon ...")
+
+        return True
 
     def _extract_meta(self):
         if not bottle.request.json:
@@ -266,14 +278,15 @@ class DrumsDaemon(object):
         try:
             meta = bottle.request.json['meta']
         except KeyError:
-            logging.error("Request is JSON but `meta` key is not present.")
+            self.logger.error("Request is JSON but `meta` key is not present.")
             meta = ''
         except ValueError:
-            logging.error("Request is not vailid JSON.")
+            self.logger.error("Request is not vailid JSON.")
             meta = ''
 
         if not isinstance(meta, basestring):
-            logging.error("Request is JSON, but the value for `meta` can only be string")
+            self.logger.error(
+                "Request is JSON, but the value for `meta` can only be string")
             meta = ''
 
         return meta
@@ -290,20 +303,21 @@ class DrumsDaemon(object):
 
     def _callback_pid(self, pid, data):
         #pprint(data)
-        d = {'src': self.hostname, 'type': 'pid', 'key' : pid, 'data' : data}
+        d = {'src': self.hostname, 'type': 'pid', 'key': pid, 'data': data}
         d_packed = msgpack.dumps(d)
         self.cache_pid.put('pid', pid, d_packed)
         self.__send_data_filtered(d, d_packed)
 
-
     def _callback_host(self, host, data):
-        d = {'src': self.hostname,'type': 'host', 'key' : 'host', 'data' : data}
+        d = {'src': self.hostname, 'type': 'host', 'key': 'host', 'data': data}
         d_packed = msgpack.dumps(d)
         self.cache_host.put('host', 'host', d_packed)
         self.__send_data_filtered(d, d_packed)
 
     def _callback_latency(self, target, data):
-        d = {'src': self.hostname,'type': 'latency', 'key' : target, 'data' : data}
+        d = {
+            'src': self.hostname, 'type': 'latency',
+            'key': target, 'data': data}
         d_packed = msgpack.dumps(d)
         self.cache_latency.put('latency', target, d_packed)
         self.__send_data_filtered(d, d_packed)
@@ -327,6 +341,7 @@ class DrumsDaemon(object):
             return http_response(DrumsError.SUCCESS)
         else:
             return http_response(DrumsError.NOTFOUND)
+
     def get_info(self):
         return {"name": "Drums Daemon",
                 "version": __version__,
@@ -335,7 +350,9 @@ class DrumsDaemon(object):
 
     def add_pid(self, pid):
         # Cache entry will be created automatically on first callback call
-        http_response(self.drums.monitor_pid(pid, self._callback_pid, self._extract_meta()))
+        http_response(
+            self.drums.monitor_pid(
+                pid, self._callback_pid, self._extract_meta()))
 
     def remove_pid(self, pid):
         # Cache entry should manually be removed
@@ -348,7 +365,7 @@ class DrumsDaemon(object):
     def remove_filter_pid(self, pid, key_path):
         return self.remove_filter('pid', pid, key_path)
 
-    def get_pid(self, pid, key_path = None):
+    def get_pid(self, pid, key_path=None):
         d = self.cache_pid.get('pid', pid, key_path)
         if d:
             return d
@@ -356,7 +373,9 @@ class DrumsDaemon(object):
             http_response(DrumsError.NOTFOUND)
 
     def enable_host(self):
-        http_response(self.drums.monitor_host(self._callback_host, self._extract_meta()))
+        http_response(
+            self.drums.monitor_host(
+                self._callback_host, self._extract_meta()))
 
     def disable_host(self):
         http_response(self.drums.remove_host())
@@ -367,7 +386,7 @@ class DrumsDaemon(object):
     def remove_filter_host(self, key_path):
         return self.remove_filter('host', 'host', key_path)
 
-    def get_host(self, key_path = None):
+    def get_host(self, key_path=None):
         d = self.cache_host.get('host', 'host', key_path)
         if d:
             return d
@@ -376,7 +395,9 @@ class DrumsDaemon(object):
 
     def add_latency(self, target):
         if self.__host_regex.match(target) or self.__ip_regex.match(target):
-            http_response(self.drums.monitor_target_latency(target, self._callback_latency, self._extract_meta()))
+            http_response(
+                self.drums.monitor_target_latency(
+                    target, self._callback_latency, self._extract_meta()))
         else:
             http_response(DrumsError.NOTFOUND)
 
@@ -387,19 +408,25 @@ class DrumsDaemon(object):
             http_response(DrumsError.NOTFOUND)
 
     def add_filter_latency(self, target, key_path):
-        if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
+        if target == '~' or \
+                self.__host_regex.match(target) or \
+                self.__ip_regex.match(target):
             return self.add_filter('latency', target, key_path)
         else:
             http_response(DrumsError.NOTFOUND)
 
     def remove_filter_latency(self, target, key_path):
-        if target == '~' or self.__host_regex.match(target) or self.__ip_regex.match(target):
+        if target == '~' or \
+                self.__host_regex.match(target) or \
+                self.__ip_regex.match(target):
             return self.remove_filter('latency', target, key_path)
         else:
             http_response(DrumsError.NOTFOUND)
 
-    def get_latency(self, target, key_path = None):
-        if not (self.__host_regex.match(target) or self.__ip_regex.match(target)):
+    def get_latency(self, target, key_path=None):
+        if not (
+                self.__host_regex.match(target) or
+                self.__ip_regex.match(target)):
             http_response(DrumsError.NOTFOUND)
         d = self.cache_latency.get('latency', target, key_path)
         if d:
@@ -411,22 +438,17 @@ class DrumsDaemon(object):
         # This will happen if necessary
         if direction == "bi":
             direction = ""
-        http_response(self.drums.monitor_socket((proto, direction, port), self._callback_sock, self._extract_meta()))
-
-
-
-        #res = self.drums.create_monitor_socket(self._callback_sock)
-        #if  res == DrumsError.SUCCESS:
-        #    if direction == "bi":
-        #        direction = ""
-        #    http_response(self.drums.add_socket_to_monitor((proto, direction, port)))
-        #else:
-         #   http_response(res)
+        http_response(
+            self.drums.monitor_socket(
+                (proto, direction, port),
+                self._callback_sock, self._extract_meta()))
 
     def remove_socket(self, proto, direction, port):
         if direction == "bi":
                 direction = ""
-        http_response(self.drums.remove_socket((proto, direction, port), self._extract_meta()))
+        http_response(
+            self.drums.remove_socket(
+                (proto, direction, port), self._extract_meta()))
 
     def add_filter_socket(self, key_path):
         return self.add_filter('socket', 'socket', key_path)
@@ -434,7 +456,7 @@ class DrumsDaemon(object):
     def remove_filter_socket(self, key_path):
         return self.add_filter('socket', 'socket', key_path)
 
-    def get_socket(self, proto, port, key_path = None):
+    def get_socket(self, proto, port, key_path=None):
         d = self.cache_socket.get('socket', "%s:%s" % (proto, port), key_path)
         if d:
             return d
@@ -446,8 +468,8 @@ class DrumsDaemon(object):
 
     def remove_filters(self):
         try:
-           self.data_filter.reset()
-           return http_response(DrumsError.SUCCESS)
+            self.data_filter.reset()
+            return http_response(DrumsError.SUCCESS)
         except:
             return http_response(DrumsError.RUNTIME)
 
@@ -455,7 +477,10 @@ if __name__ == "__main__":
     config = dict()
 
     # TODO: Level
-    logging.basicConfig(filename=config.get('logfile', 'drumsd.log'), level=logging.DEBUG, format='%(asctime)s %(message)s')
+    logging.basicConfig(
+        filename=config.get('logfile', 'drumsd.log'),
+        level=logging.DEBUG,
+        format='[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
 
     # TODO: API version should be static for each call, not from __api__
     rp = "/drums/v%s" % (__api__,)
@@ -473,11 +498,16 @@ if __name__ == "__main__":
     path_latency_filter = (path_latency_base % 'filter') + "/<target>"
 
     path_socket_base = rp + "/%s/socket"
-    path_socket_monitor = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
-    path_socket_get = (path_socket_base % 'monitor') + "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
+    path_socket_monitor = (
+        path_socket_base % 'monitor') + \
+        "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
+
+    path_socket_get = (
+        path_socket_base % 'monitor') + \
+        "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
     #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
 
-    logging.info("Starting drums-daemon.")
+    logging.info("Starting drums-daemon ...")
     app = DrumsDaemon(config)
 
     ### Routes
@@ -488,22 +518,31 @@ if __name__ == "__main__":
     bottle.route(path_pid_monitor, "DELETE", app.remove_pid)
     bottle.route(path_pid_monitor, "GET", app.get_pid)
     bottle.route(path_pid_monitor + "/<key_path:path>", "GET", app.get_pid)
-    bottle.route(path_pid_filter + "/<key_path:path>", "POST", app.add_filter_pid)
-    bottle.route(path_pid_filter + "/<key_path:path>", "DELETE", app.remove_filter_pid)
+    bottle.route(
+        path_pid_filter + "/<key_path:path>", "POST", app.add_filter_pid)
+    bottle.route(
+        path_pid_filter + "/<key_path:path>", "DELETE", app.remove_filter_pid)
 
     bottle.route(path_host_monitor, "POST", app.enable_host)
     bottle.route(path_host_monitor, "DELETE", app.disable_host)
     bottle.route(path_host_monitor, "GET", app.get_host)
-    bottle.route(path_host_monitor+ "/<key_path:path>", "GET", app.get_host)
-    bottle.route(path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
-    bottle.route(path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
+    bottle.route(path_host_monitor + "/<key_path:path>", "GET", app.get_host)
+    bottle.route(
+        path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
+    bottle.route(
+        path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
 
     bottle.route(path_latency_monitor, "POST", app.add_latency)
     bottle.route(path_latency_monitor, "DELETE", app.remove_latency)
     bottle.route(path_latency_monitor, "GET", app.get_latency)
-    bottle.route(path_latency_monitor + "/<key_path:path>", "GET", app.get_latency)
-    bottle.route(path_latency_filter + "/<key_path:path>", "POST", app.add_filter_latency)
-    bottle.route(path_latency_filter + "/<key_path:path>", "DELETE", app.add_filter_latency)
+    bottle.route(
+        path_latency_monitor + "/<key_path:path>", "GET", app.get_latency)
+    bottle.route(
+        path_latency_filter +
+        "/<key_path:path>", "POST", app.add_filter_latency)
+    bottle.route(
+        path_latency_filter +
+        "/<key_path:path>", "DELETE", app.add_filter_latency)
 
     bottle.route(path_socket_monitor, "POST", app.add_socket)
     bottle.route(path_socket_monitor, "DELETE", app.remove_socket)
@@ -517,7 +556,16 @@ if __name__ == "__main__":
     #bottle.route(path_filter, "POST", app.add_filter)
     #bottle.route(path_filter, "DELETE", app.remove_filter)
 
-    server = Thread(target = bottle.run, kwargs = {'host': config.get("host", "0.0.0.0"), 'port': config.get("port", 8001)})
-    server.daemon = True;
+    server = Thread(
+        target=bottle.run,
+        kwargs={
+            'host': config.get("host", "0.0.0.0"),
+            'port': config.get("port", 8001)})
+    server.daemon = True
+
     server.start()
+
+    # This is blocking
     app.loop()
+
+    logging.info("drums-daemon exited cleanly.")
