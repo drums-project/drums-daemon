@@ -284,6 +284,7 @@ class Drums(Thread):
         self.q.put({'shutdown': {'shutdown', None}})
         self.terminate_event.set()
 
+        # TODO: Should we choose join() instead?
         while self.is_running.is_set():
             pass
 
@@ -308,7 +309,6 @@ class Drums(Thread):
     # This runs its own context
     def run(self):
         # results are dicts, keys are tasks
-        # TODO: BUG get should be non-blocking
         self.logger.info("Drums's processing thread started.")
         self.is_running.set()
         while not self.terminate_event.is_set():
