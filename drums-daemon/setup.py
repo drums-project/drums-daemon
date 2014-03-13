@@ -1,9 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
 
 try:
     from setuptools.core import setup
 except ImportError:
     from distutils.core import setup
+
 
 def get_version():
     INIT = os.path.abspath(os.path.join(os.path.dirname(__file__), 'drumsd.py'))
@@ -24,15 +28,16 @@ def get_version():
 VERSION = get_version()
 
 setup(
-    name = 'drums-daemon',
-    version = VERSION,
-    author = 'Mani Monajjemi',
-    author_email = 'TODO',
-    packages = [],
-    url = 'TODO',
-    license = 'LICENSE',
-    install_requires = ['bottle >= 0.10', 'drums', 'pyzmq >= 2.2', 'msgpack-python'],
-    description = 'TODO',
-    scripts = ["drumsd.py"],
-    test_suite = 'test.test_drumsd.get_suite'
+    name='drums-daemon',
+    version=VERSION,
+    author='Mani Monajjemi',
+    author_email='mmonajje@sfu.ca',
+    packages=[],
+    url='http://autonomylab.org/drums/',
+    license='Apache License 2.0',
+    install_requires=[
+        'bottle >= 0.10', 'drums >= 0.9', 'pyzmq >= 2.2', 'msgpack-python', 'python-daemon==1.6'],
+    description='TODO',
+    scripts=["drumsd.py"]
+    #test_suite= 'test.test_drumsd.get_suite'
 )

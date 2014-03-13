@@ -1,7 +1,22 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Copyright 2013 Mani Monajjemi (AutonomyLab, Simon Fraser University)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
 
 __version__ = "0.9.0"
-# Who needs precision for API version?
 __api__ = "1"
 
 version_info = tuple([int(num) for num in __version__.split('.')])
@@ -11,6 +26,9 @@ import logging
 import re
 from threading import Thread, Lock
 from copy import copy
+from daemon import runner
+from os.path import dirname, abspath, isdir
+import sys
 
 import bottle
 import zmq
@@ -241,7 +259,12 @@ class DrumsDaemon(object):
         self.sock = self.ctx.socket(zmq.PUB)
         self.zmq_addr = "tcp://*:" + str(self.config.get('publish_port', 8002))
         self.zmq_addr_outside = self.zmq_addr.replace('*', self.hostname)
-        self.sock.bind(self.zmq_addr)
+        try:
+            self.sock.bind(self.zmq_addr)
+        except zmq.core.error.ZMQError as e:
+            self.logger.error("Critical Error, ZMQ Address (%s) is in use (%s)." % (self.zmq_addr, str(e)))
+            self._stop()
+
         self.loop_counter = 0
         self.data_filter = Filter()
 
@@ -257,6 +280,9 @@ class DrumsDaemon(object):
         # Starts drums in a new thread
         self.drums.init()
 
+    def cleanup(self):
+        self.drums.shutdown()  # Block until clean shutdown
+
     def loop(self):
         self.logger.info("drums-daemon app's main loop started ...")
 
@@ -266,7 +292,7 @@ class DrumsDaemon(object):
         except (KeyboardInterrupt, SystemExit):
             self.logger.info("CTRL+C heard in the main loop ...")
             self.logger.info("Shutting down drums ...")
-            self.drums.shutdown()  # Block until clean shutdown
+            self.cleanup()
             self.logger.info("Shutting down drums-daemon ...")
 
         return True
@@ -473,99 +499,134 @@ class DrumsDaemon(object):
         except:
             return http_response(DrumsError.RUNTIME)
 
+
+class DrumsRunner(object):
+    def __init__(self, config):
+        self.config = config
+        self.stdin_path = '/dev/null'
+        self.stdout_path = config.get('logpath', '/tmp') + '/drums-daemon.console'
+        self.stderr_path = config.get('logpath', '/tmp') + '/drums-daemon.console'
+        self.pidfile_path = config.get('pidpath', '/tmp') + '/drums-daemon.pid'
+        self.pidfile_timeout = 5
+        self.logger = logging.getLogger(type(self).__name__)
+
+    def run(self):
+        # TODO: API version should be static for each call, not from __api__
+        rp = "/drums/v%s" % (__api__,)
+
+        path_pid_base = rp + "/%s/pid"
+        path_pid_monitor = (path_pid_base % 'monitor') + "/<pid:int>"
+        path_pid_filter = (path_pid_base % 'filter') + "/<pid:re:[0-9]+|~>"
+
+        path_host_base = rp + "/%s/host"
+        path_host_monitor = (path_host_base % 'monitor')
+        path_host_filter = (path_host_base % 'filter')
+
+        path_latency_base = rp + "/%s/latency"
+        path_latency_monitor = (path_latency_base % 'monitor') + "/<target>"
+        path_latency_filter = (path_latency_base % 'filter') + "/<target>"
+
+        path_socket_base = rp + "/%s/socket"
+        path_socket_monitor = (
+            path_socket_base % 'monitor') + \
+            "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
+
+        path_socket_get = (
+            path_socket_base % 'monitor') + \
+            "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
+        #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
+
+        self.logger.info("Starting drums-daemon ...")
+        app = DrumsDaemon(config)
+
+        ### Routes
+        bottle.debug(True)
+        bottle.route(rp + "/info", "GET", app.get_info)
+
+        bottle.route(path_pid_monitor, "POST", app.add_pid)
+        bottle.route(path_pid_monitor, "DELETE", app.remove_pid)
+        bottle.route(path_pid_monitor, "GET", app.get_pid)
+        bottle.route(path_pid_monitor + "/<key_path:path>", "GET", app.get_pid)
+        bottle.route(
+            path_pid_filter + "/<key_path:path>", "POST", app.add_filter_pid)
+        bottle.route(
+            path_pid_filter + "/<key_path:path>", "DELETE", app.remove_filter_pid)
+
+        bottle.route(path_host_monitor, "POST", app.enable_host)
+        bottle.route(path_host_monitor, "DELETE", app.disable_host)
+        bottle.route(path_host_monitor, "GET", app.get_host)
+        bottle.route(path_host_monitor + "/<key_path:path>", "GET", app.get_host)
+        bottle.route(
+            path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
+        bottle.route(
+            path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
+
+        bottle.route(path_latency_monitor, "POST", app.add_latency)
+        bottle.route(path_latency_monitor, "DELETE", app.remove_latency)
+        bottle.route(path_latency_monitor, "GET", app.get_latency)
+        bottle.route(
+            path_latency_monitor + "/<key_path:path>", "GET", app.get_latency)
+        bottle.route(
+            path_latency_filter +
+            "/<key_path:path>", "POST", app.add_filter_latency)
+        bottle.route(
+            path_latency_filter +
+            "/<key_path:path>", "DELETE", app.add_filter_latency)
+
+        bottle.route(path_socket_monitor, "POST", app.add_socket)
+        bottle.route(path_socket_monitor, "DELETE", app.remove_socket)
+        bottle.route(path_socket_get, "GET", app.get_socket)
+        bottle.route(path_socket_get + "/<key_path:path>", "GET", app.get_socket)
+        #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "POST", app.add_filter_socket)
+        #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_socket)
+
+        bottle.route(rp + '/filter', "GET", app.get_filters)
+        bottle.route(rp + '/filter', "DELETE", app.remove_filters)
+        #bottle.route(path_filter, "POST", app.add_filter)
+        #bottle.route(path_filter, "DELETE", app.remove_filter)
+
+        server = Thread(
+            target=bottle.run,
+            kwargs={
+                'host': config.get("host", "0.0.0.0"),
+                'port': config.get("port", 8001)})
+        server.daemon = True
+
+        server.start()
+
+        # This is blocking
+        app.loop()
+
+        self.logger.info("drums-daemon exited cleanly.")
+
+
 if __name__ == "__main__":
-    config = dict()
+        config = dict()
+        if not config.get('pidpath', '/tmp'):
+            print 'pid directory does not exist at %s' % settings.PID_PATH
+            sys.exit(1)
 
-    # TODO: Level
-    logging.basicConfig(
-        filename=config.get('logfile', 'drumsd.log'),
-        level=logging.DEBUG,
-        format='[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
+        if not config.get('logpath', '/tmp'):
+            print 'log directory does not exist at %s' % settings.LOG_PATH
+            sys.exit(1)
 
-    # TODO: API version should be static for each call, not from __api__
-    rp = "/drums/v%s" % (__api__,)
+        ddr = DrumsRunner(config)
 
-    path_pid_base = rp + "/%s/pid"
-    path_pid_monitor = (path_pid_base % 'monitor') + "/<pid:int>"
-    path_pid_filter = (path_pid_base % 'filter') + "/<pid:re:[0-9]+|~>"
-
-    path_host_base = rp + "/%s/host"
-    path_host_monitor = (path_host_base % 'monitor')
-    path_host_filter = (path_host_base % 'filter')
-
-    path_latency_base = rp + "/%s/latency"
-    path_latency_monitor = (path_latency_base % 'monitor') + "/<target>"
-    path_latency_filter = (path_latency_base % 'filter') + "/<target>"
-
-    path_socket_base = rp + "/%s/socket"
-    path_socket_monitor = (
-        path_socket_base % 'monitor') + \
-        "/<proto:re:tcp|udp>/<direction:re:bi|src|dst>/<port:int>"
-
-    path_socket_get = (
-        path_socket_base % 'monitor') + \
-        "/<proto:re:tcp|udp|~>/<port:re:[0-9]+|~>"
-    #path_socket_filter = (path_socket_base % 'filter') + "/<proto:re:tcp|udp|~>/<direction:re:bi|src|dst|~>/<port:re:[0-9]+|~>"
-
-    logging.info("Starting drums-daemon ...")
-    app = DrumsDaemon(config)
-
-    ### Routes
-    bottle.debug(True)
-    bottle.route(rp + "/info", "GET", app.get_info)
-
-    bottle.route(path_pid_monitor, "POST", app.add_pid)
-    bottle.route(path_pid_monitor, "DELETE", app.remove_pid)
-    bottle.route(path_pid_monitor, "GET", app.get_pid)
-    bottle.route(path_pid_monitor + "/<key_path:path>", "GET", app.get_pid)
-    bottle.route(
-        path_pid_filter + "/<key_path:path>", "POST", app.add_filter_pid)
-    bottle.route(
-        path_pid_filter + "/<key_path:path>", "DELETE", app.remove_filter_pid)
-
-    bottle.route(path_host_monitor, "POST", app.enable_host)
-    bottle.route(path_host_monitor, "DELETE", app.disable_host)
-    bottle.route(path_host_monitor, "GET", app.get_host)
-    bottle.route(path_host_monitor + "/<key_path:path>", "GET", app.get_host)
-    bottle.route(
-        path_host_filter + "/<key_path:path>", "POST", app.add_filter_host)
-    bottle.route(
-        path_host_filter + "/<key_path:path>", "DELETE", app.remove_filter_host)
-
-    bottle.route(path_latency_monitor, "POST", app.add_latency)
-    bottle.route(path_latency_monitor, "DELETE", app.remove_latency)
-    bottle.route(path_latency_monitor, "GET", app.get_latency)
-    bottle.route(
-        path_latency_monitor + "/<key_path:path>", "GET", app.get_latency)
-    bottle.route(
-        path_latency_filter +
-        "/<key_path:path>", "POST", app.add_filter_latency)
-    bottle.route(
-        path_latency_filter +
-        "/<key_path:path>", "DELETE", app.add_filter_latency)
-
-    bottle.route(path_socket_monitor, "POST", app.add_socket)
-    bottle.route(path_socket_monitor, "DELETE", app.remove_socket)
-    bottle.route(path_socket_get, "GET", app.get_socket)
-    bottle.route(path_socket_get + "/<key_path:path>", "GET", app.get_socket)
-    #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "POST", app.add_filter_socket)
-    #bottle.route((path_socket_base % 'filter') + "/<key_path:path>", "DELETE", app.remove_filter_socket)
-
-    bottle.route(rp + '/filter', "GET", app.get_filters)
-    bottle.route(rp + '/filter', "DELETE", app.remove_filters)
-    #bottle.route(path_filter, "POST", app.add_filter)
-    #bottle.route(path_filter, "DELETE", app.remove_filter)
-
-    server = Thread(
-        target=bottle.run,
-        kwargs={
-            'host': config.get("host", "0.0.0.0"),
-            'port': config.get("port", 8001)})
-    server.daemon = True
-
-    server.start()
-
-    # This is blocking
-    app.loop()
-
-    logging.info("drums-daemon exited cleanly.")
+        # TODO: Level
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s')
+        handler = logging.FileHandler(config.get('logpath', '/tmp') + '/drums-daemon.log')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+            
+        if len(sys.argv) and sys.argv[1] == 'run':
+            ddr.run()
+        else:
+            try:
+                daemon_runner = runner.DaemonRunner(ddr)
+                daemon_runner.daemon_context.files_preserve = [handler.stream]
+                daemon_runner.do_action()
+            except runner.DaemonRunnerStopFailureError as e:
+                sys.stderr.write("%s (Possible Cause: No instance is running)\n" % str(e))
+                sys.exit(1)
