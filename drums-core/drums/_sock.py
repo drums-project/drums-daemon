@@ -1,5 +1,19 @@
 # -*- coding: utf-8 -*-
+"""
+Copyright 2013 Mani Monajjemi (AutonomyLab, Simon Fraser University)
 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
 """
 Socket monitoring daemon
 """
@@ -216,8 +230,8 @@ class SocketMonitor(TaskBase):
         self.packets_per_callback = 0
         # The only non-blocking way I found to work with pcapy
         self.pc.dispatch(0, process_callback)
-        self.logger.info(
-            "packets per callback: %d" % (self.packets_per_callback, ))
+        #self.logger.info(
+        #    "packets per callback: %d" % (self.packets_per_callback, ))
 
         _data = dict()
         #_data['__ppc__'] = self.packets_per_callback
