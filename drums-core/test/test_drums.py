@@ -189,10 +189,10 @@ class SocketTaskTest(unittest.TestCase):
         #self.p2 = os.pipe()
 
         cmds = list()
-        cmds.append("netcat -l 3333 > /dev/null")
-        cmds.append("netcat -l -u 4444 > /dev/null")
-        cmds.append("netcat localhost 3333 < /dev/urandom")
-        cmds.append("netcat -u localhost 4444 < /dev/urandom")
+        cmds.append("nc -l 3333 > /dev/null")
+        cmds.append("nc -l -u 4444 > /dev/null")
+        cmds.append("nc localhost 3333 < /dev/urandom")
+        cmds.append("nc -u localhost 4444 < /dev/urandom")
 
         # Process Groups are needed in order to properly kill
         # the netcats running on a spawned shell
@@ -209,7 +209,7 @@ class SocketTaskTest(unittest.TestCase):
 
         t1 = ("tcp", "dst", "3333")
         t2 = ("udp", "dst", "4444")
-        meta1 = 'netcat'
+        meta1 = 'nc'
         meta2 = 'dummy'
         self.assertEqual(task.register_task(t2, meta2), DrumsError.SUCCESS)
         self.assertEqual(task.register_task(t1, meta1), DrumsError.SUCCESS)
@@ -337,8 +337,8 @@ class DrumsTest(unittest.TestCase):
         self.p_list = list()
 
         cmds = list()
-        cmds.append("netcat -l 3333 > /dev/null")
-        cmds.append("netcat localhost 3333 < /dev/urandom")
+        cmds.append("nc -l 3333 > /dev/null")
+        cmds.append("nc localhost 3333 < /dev/urandom")
 
         for c in cmds:
             self.p_list.append(
