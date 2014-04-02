@@ -32,7 +32,7 @@ setup(
     packages=find_packages(exclude=['test']),
     url='http://autonomylab.org/drums/',
     license='Apache License 2.0',
-    install_requires=['pcapy == 0.10.8', 'psutil >= 0.4', 'setproctitle'],
+    install_requires=['pcapy == 0.10.8', 'psutil >= 2.0', 'setproctitle'],
     dependency_links = ['https://github.com/CoreSecurity/pcapy/archive/0.10.8.tar.gz#egg=pcapy-0.10.8'],
     description='System Monitoring Library',
     test_suite='test.test_drums.get_suite'
