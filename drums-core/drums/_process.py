@@ -42,6 +42,7 @@ class ProcessMonitor(TaskBase):
                 'name': [],
                 'exe': [],
                 'status': [],
+                'cmdline': [],
                 'cpu_percent': [],
                 'cpu_times': [],
                 'memory_info': [],
