@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "0.9.2"
+__version__ = "0.9.4"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
 from _common import *
@@ -51,9 +51,9 @@ class Drums(Thread):
 
     def __init__(
             self, process_interval=1, host_interval=1,
-            socket_interval=1, late_interval=1,
-            late_pings_per_interval=4, late_wait_between_pings=0.1,
-            process_fields=[], host_fields=[]):
+            socket_interval=1, late_interval=5,
+            late_pings_per_interval=5, late_wait_between_pings=0.2,
+            process_fields={}, host_fields={}):
         Thread.__init__(self)
         self.q = Queue()
         self.process_interval = process_interval

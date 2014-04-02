@@ -112,8 +112,8 @@ class ProcessTaskTest(unittest.TestCase):
             except Empty:
                 self.fail(
                     "Process monitor did not report anything in 1 seconds")
-            threads = d[pid]['get_threads']
-            mem = d[pid]['get_memory_info']['rss']
+            threads = d[pid]['threads']
+            mem = d[pid]['memory_info']['rss']
             #name = d[pid]['name']
             getmeta = d[pid]['meta']
             self.assertGreater(len(threads), 0, "Testing number of threads")
@@ -357,8 +357,8 @@ class DrumsTest(unittest.TestCase):
     def callback(self, pid, data):
         self.flag += 1
         self.assertEqual(pid, self.pid)
-        threads = data['get_threads']
-        mem = data['get_memory_info']['rss']
+        threads = data['threads']
+        mem = data['memory_info']['rss']
         #name = data['name']
         self.assertGreater(len(threads), 0, "Testing number of threads")
         self.assertGreater(mem, 0, "Testing memory")

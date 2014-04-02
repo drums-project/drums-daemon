@@ -27,7 +27,7 @@ import psutil
 class ProcessMonitor(TaskBase):
     def __init__(
             self, result_queue, default_interval,
-            name="drums_processmonitor", fields=[], pids=[]):
+            name="drums_processmonitor", fields={}, pids=[]):
         TaskBase.__init__(self, result_queue, default_interval, name)
         self.set_fields(fields)
         for p in list(set(pids)):
@@ -35,13 +35,20 @@ class ProcessMonitor(TaskBase):
 
     # TODO: This is not thread safe
     def set_fields(self, fields):
-        if fields:
-            self.fields = list(set(fields))
+        if isinstance(fields, dict) and fields:
+            self.fields = fields
         else:
-            self.fields = [
-                'name', 'status', 'get_cpu_percent', 'get_cpu_times',
-                'get_memory_info', 'get_io_counters',
-                'get_threads', 'cmdline']
+            self.fields = {
+                'name': [],
+                'exe': [],
+                'status': [],
+                'cpu_percent': [],
+                'cpu_times': [],
+                'memory_info': [],
+                'memory_percent': [],
+                'io_counters': [],
+                'threads': [],
+                'connections': []}
 
     def register_task_core(self, task, meta=''):
         """
@@ -71,29 +78,24 @@ class ProcessMonitor(TaskBase):
 
     def do(self):
         data = dict()
+        # TODO: Check if the outer try is still needed
         try:
             for pid, (proc, meta) in self.task_map.items():
                 data[pid] = dict()
-                for f in self.fields:
+                for f, params in self.fields.items():
                     attr = getattr(proc, f, None)
                     if callable(attr):
-                        if f == "get_cpu_percent":
-                            dummy = attr(0)
-                        else:
+                        try:
                             dummy = attr()
-                    elif attr is not None:
-                        dummy = str(attr)
+                        except TypeError:
+                            dummy = attr(params[0])
                     else:
                         self.logger.warning(
                             "[in %s] Attribute `%s` not found." % (self, f))
                         continue
-
-                    # This is all about the s**t about pickle is not able
-                    # to encode/decode a nested class (used by psutils)
-                    # this code converts namedtuples to dict
                     data[pid][f] = psutil_convert(dummy)
-                    data[pid]['timestamp'] = time.time()
-                    data[pid]['meta'] = meta
+                data[pid]['timestamp'] = time.time()
+                data[pid]['meta'] = meta
 
             if data:
                 try:
@@ -106,8 +108,8 @@ class ProcessMonitor(TaskBase):
 
         except AttributeError:
             self.logger.warning(
-                "Exception: [in %s] Attribute `%s` not found." % (self, f))
-        # TODO: Fix the following circular loople
+                "Exception: [in %s] Attribute '%s' not found." % (self, f))
+        # TODO: Fix the following circular loop
         except psutil.NoSuchProcess:
             self.logger.warning("NoSuchProcess for %s, removing it", pid)
             del self.task_map[pid]

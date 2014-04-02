@@ -64,7 +64,7 @@ def namedtuple_to_dict(nt):
 def psutil_convert(data):
     if isinstance(data, tuple):
         return namedtuple_to_dict(data)
-    elif type(data) is list:
+    elif type(data) is list and data:
         if isinstance(data[0], tuple):
             return [namedtuple_to_dict(d) for d in data]
         else:
