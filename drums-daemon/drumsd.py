@@ -619,8 +619,8 @@ if __name__ == "__main__":
         handler = logging.FileHandler(config.get('logpath', '/tmp') + '/drums-daemon.log')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-            
-        if len(sys.argv) and sys.argv[1] == 'run':
+        
+        if len(sys.argv) > 1 and sys.argv[1] == 'run':
             ddr.run()
         else:
             try:
