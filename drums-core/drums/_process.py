@@ -49,7 +49,8 @@ class ProcessMonitor(TaskBase):
                 'memory_percent': [],
                 'io_counters': [],
                 'threads': [],
-                'connections': []}
+#                'connections': []
+            }
 
     def register_task_core(self, task, meta=''):
         """
