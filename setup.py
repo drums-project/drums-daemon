@@ -31,9 +31,10 @@ setup(
     author_email='mmonajje@sfu.ca',
     packages=find_packages(exclude=['test']),
     url='http://autonomylab.org/drums/',
+    download_url = 'https://github.com/drums-project/drums-core/tarball/' + VERSION,
     license='Apache License 2.0',
     install_requires=['pcapy == 0.10.8', 'psutil >= 2.0', 'setproctitle'],
     dependency_links = ['https://github.com/CoreSecurity/pcapy/archive/0.10.8.tar.gz#egg=pcapy-0.10.8'],
-    description='System Monitoring Library',
+    description='drums-core is a system monitoring library. It provides an easy to use async API to register system monitoring tasks.',
     test_suite='test.test_drums.get_suite'
 )
