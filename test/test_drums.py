@@ -150,9 +150,9 @@ class HostTaskTest(unittest.TestCase):
         time.sleep(0.1)
         try:
             try:
-                d = q.get(block=True, timeout=1)
+                d = q.get(block=True, timeout=5)
             except Empty:
-                self.fail("Host monitor did not report anything in 1 seconds")
+                self.fail("Host monitor did not report anything in 5 seconds")
             #pprint(d)
             net_count = d['host']['net_io_counters']
             vm = d['host']['virtual_memory']
@@ -200,7 +200,7 @@ class SocketTaskTest(unittest.TestCase):
         for c in cmds:
             self.p_list.append(
                 subprocess.Popen(c, shell=True, preexec_fn=os.setsid))
-            time.sleep(0.1)
+            time.sleep(1)
 
     def test_socket_basic(self):
         q = Queue()
@@ -403,8 +403,8 @@ class DrumsTest(unittest.TestCase):
         self.d.monitor_target_latency(
             'google.co.jp', self.callback_late, _sr('google.co.jp'))
 
-        print "Waiting some 5 seconds ..."
-        time.sleep(5)
+        print "Waiting some 10 seconds ..."
+        time.sleep(10)
 
         #print self.flag, self.flag_another, self.flag_host
         self.assertGreater(self.flag, 0)
