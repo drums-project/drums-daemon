@@ -143,7 +143,7 @@ from drums._host import HostMonitor
 class HostTaskTest(unittest.TestCase):
     def test_host_creation(self):
         q = Queue()
-        task = HostMonitor(q, 0.1)
+        task = HostMonitor(q, 1.0)
         task.start()
         meta = 'hostishu'
         self.assertEqual(task.register_task(None, meta), DrumsError.SUCCESS)
@@ -222,7 +222,7 @@ class SocketTaskTest(unittest.TestCase):
                 d = q.get(block=True, timeout=2)
             except Empty:
                 self.fail("Socket monitor did not report anything in 2 seconds")
-            time.sleep(0.5)
+            time.sleep(5)
             d = q.get()
             pprint(d)
             byte_count = d['tcp:3333']['bytes']
