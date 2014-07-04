@@ -32,11 +32,12 @@ setup(
     version=VERSION,
     author='Mani Monajjemi',
     author_email='mmonajje@sfu.ca',
-    packages=[],
+    packages=['drums'],
     url='http://autonomylab.org/drums/',
     license='Apache License 2.0',
     install_requires=[
         'pcapy == 0.10.8', 'psutil >= 2.0', 'setproctitle', 'bottle >= 0.10', 'pyzmq >= 2.2', 'msgpack-python', 'python-daemon==1.6'],
+    dependency_links = ['https://github.com/CoreSecurity/pcapy/archive/0.10.8.tar.gz#egg=pcapy-0.10.8'],
     description='TODO',
     scripts=["drumsd.py"],
     test_suite='test.test_drums.get_suite'
