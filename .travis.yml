@@ -2,8 +2,8 @@ language: python
 python:
   - "2.7"
 before_install:
-  - sudo apt-get install libpcap-dev
+    - sudo apt-get install libpcap-dev python-dev python-pip netcat
 install: 
-  - sh -c "cd drums-core && python setup.py install"
+  - sh -c "sudo python setup.py install"
 script: 
-  - sh -c "cd drums-core && sudo python setup.py test"
+  - sh -c "sudo python setup.py test"
