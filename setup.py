@@ -39,6 +39,7 @@ setup(
         'pcapy == 0.10.8', 'psutil >= 2.0', 'setproctitle', 'bottle >= 0.10', 'pyzmq >= 2.2', 'msgpack-python', 'python-daemon==1.6'],
     dependency_links = ['https://github.com/CoreSecurity/pcapy/archive/0.10.8.tar.gz#egg=pcapy-0.10.8'],
     description='drums is a system monitoring tool. It provides an easy to use async API to register system monitoring tasks.',
+    download_url = "https://github.com/drums-project/drums-daemon/tarball/%s" % (VERSION,), 
     scripts=["drumsd.py"],
     test_suite='test.test_drums.get_suite'
 )
