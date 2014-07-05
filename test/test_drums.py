@@ -190,11 +190,11 @@ class SocketTaskTest(unittest.TestCase):
 
         cmds = list()
 
-        cmds.append("nc -l -u 4444 > /dev/null")                    
-        cmds.append("nc -u localhost 4444 < /dev/urandom")
+        cmds.append("nc -l -4u 4444 > /dev/null")                    
+        cmds.append("nc -4u 127.0.0.1 4444 < /dev/urandom")
 
         cmds.append("nc -l 3333 > /dev/null")
-        cmds.append("nc localhost 3333 < /dev/urandom")       
+        cmds.append("nc 127.0.0.1 3333 < /dev/urandom")       
         
         #cmds.append("cat /dev/urandom | nc -u localhost 4444")
 
