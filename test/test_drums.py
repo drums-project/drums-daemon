@@ -189,14 +189,14 @@ class SocketTaskTest(unittest.TestCase):
         #self.p2 = os.pipe()
 
         cmds = list()
+
+        cmds.append("nc -l -u 4444 > /dev/null")                    
+        cmds.append("nc -u localhost 4444 < /dev/urandom")
+
         cmds.append("nc -l 3333 > /dev/null")
-        cmds.append("cat /dev/urandom | nc localhost 3333")
+        cmds.append("nc localhost 3333 < /dev/urandom")       
         
-        cmds.append("nc -l -u 4444 > /dev/null")
-        cmds.append("cat /dev/urandom | nc -u localhost 4444")
-        #cmds.append("nc localhost 3333 < /dev/urandom")       
-        #cmds.append("nc -u localhost 4444 < /dev/urandom")
-        
+        #cmds.append("cat /dev/urandom | nc -u localhost 4444")
 
         # Process Groups are needed in order to properly kill
         # the netcats running on a spawned shell

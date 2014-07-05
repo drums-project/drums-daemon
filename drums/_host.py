@@ -71,18 +71,22 @@ class HostMonitor(TaskBase):
 
         data['host'] = dict()
         for f, params in self.fields.items():
-            attr = getattr(psutil, f, None)
-            if callable(attr):
-                try:
-                    dummy = attr()
-                except TypeError:
-                    dummy = attr(params[0])
-            else:
-                self.logger.debug(
-                    "[in %s] Attribute `%s` is not found or not \
-                    callable in psutil object."
-                    % (self, f))
-                continue
+            try:
+                attr = getattr(psutil, f, None)
+                if callable(attr):
+                    try:
+                        dummy = attr()
+                    except TypeError:
+                        dummy = attr(params[0])
+                else:
+                    self.logger.debug(
+                        "[in %s] Attribute `%s` is not found or not \
+                        callable in psutil object."
+                        % (self, f))
+                    continue
+            except IOError:
+                self.logger.warning("IOError in HostMonitor (psutil issue), ignoring ...")
+                pass
 
             data['host'][f] = psutil_convert(dummy)
 
