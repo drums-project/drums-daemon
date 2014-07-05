@@ -2,8 +2,10 @@ language: python
 python:
   - "2.7"
 before_install:
-    - sudo apt-get install libpcap-dev python-dev python-pip netcat
+    - sudo apt-get install libpcap-dev python-dev python-pip netcat libzmq-dev
 install: 
   - sh -c "sudo python setup.py install"
 script: 
   - sh -c "sudo python setup.py test"
+after_failure:
+  - sh -c "cat test.log"
