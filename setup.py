@@ -36,7 +36,7 @@ setup(
     url='http://autonomylab.org/drums/',
     license='Apache License 2.0',
     install_requires=[
-        'pcapy==0.10.8', 'psutil>=2.0', 'setproctitle', 'bottle>=0.10.1', 'pyzmq>=2.2', 'msgpack-python', 'python-daemon==1.6'],
+        'pcapy==0.10.8', 'psutil>=2.0', 'setproctitle', 'bottle>=0.10.1', 'pyzmq>=2.2', 'msgpack-python', 'python-daemon==1.5.5'],
     dependency_links = ['https://github.com/CoreSecurity/pcapy/archive/0.10.8.tar.gz#egg=pcapy-0.10.8'],
     description='drums is a system monitoring tool. It provides an easy to use async API to register system monitoring tasks.',
     download_url = "https://github.com/drums-project/drums-daemon/tarball/%s" % (VERSION,), 
