@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 __api__ = "1"
 
 version_info = tuple([int(num) for num in __version__.split('.')])
