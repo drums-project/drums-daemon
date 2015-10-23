@@ -375,12 +375,13 @@ class DrumsTest(unittest.TestCase):
 
     def callback_host(self, host, data):
         self.flag_host += 1
-        self.assertGreater(data['swap_memory']['free'], 0)
+        # TravisCI workers do not have swap space
+        self.assertGreaterEqual(int(data['swap_memory']['free']), 0)
         self.assertEqual(_sr(host), data['meta'])
 
     def callback_sock(self, sock, data):
         self.flag_sock += 1
-        self.assertGreater(data['bytes'], 0)
+        self.assertGreater(int(data['bytes']), 0)
         self.assertEqual(_sr(sock) in data['meta'], True)
 
     def callback_late(self, target, data):
